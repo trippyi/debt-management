@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>利用・返済状況</title>
+  <!-- Google Fonts: Roboto & Noto Sans JP (Material Design 3 Typeface) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=Roboto:wght@400;500;700&display=swap"
+    rel="stylesheet">
+  <!-- Google Fonts Material Symbols Outlined -->
+  <link rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="style.css?v=6">
+</head>
+
+<body>
+
+  <div class="app-container">
+    <!-- M3 Top App Bar -->
+    <header class="main-header">
+      <div class="header-branding">
+        <h1>利用・返済状況</h1>
+      </div>
+      <div class="header-actions">
+        <div class="status-indicator" id="live-status">
+          <span class="status-dot"></span>
+          <span id="status-label">同期完了</span>
+        </div>
+        <button id="refresh-btn" class="btn-refresh" title="データを再読み込み">
+          <span class="material-symbols-outlined">refresh</span>
+          <span>更新</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- ページ内メッセージ表示エリア (alertを使用しないルール) -->
+    <div id="inline-alert" class="inline-alert hidden">
+      <div class="alert-content">
+        <span class="alert-title" id="alert-title">通知</span>:
+        <span class="alert-message" id="alert-message">メッセージ内容</span>
+      </div>
+      <button class="alert-close" id="alert-close-btn" title="閉じる">
+        <span class="material-symbols-outlined" style="font-size: 16px;">close</span>
+      </button>
+    </div>
+
+    <!-- M3 サマリーセクション (Google Material Design 3 KPIカードグリッド) -->
+    <section class="summary-section">
+      <div class="summary-container">
+
+        <!-- カード1: 総利用額 & 残額 -->
+        <div class="m3-summary-card">
+          <div class="card-header-row">
+            <span class="card-label">総利用額</span>
+            <span class="summary-count-badge" id="kpi-count-used">0件</span>
+          </div>
+          <div class="card-main-val" id="kpi-total-used">¥0</div>
+          <div class="card-sub-info">
+            <span class="sub-label">残額:</span>
+            <span class="sub-val highlight-balance" id="kpi-balance">¥0</span>
+          </div>
+        </div>
+
+        <!-- カード2: 総返済額 & 返済率 -->
+        <div class="m3-summary-card">
+          <div class="card-header-row">
+            <span class="card-label">総返済額</span>
+            <div class="rate-badge">
+              <span class="rate-label">返済率</span>
+              <span class="rate-value-text" id="kpi-repay-rate">0.00%</span>
+            </div>
+          </div>
+          <div class="card-main-val" id="kpi-total-repaid">¥0</div>
+          <div class="card-sub-info">
+            <span class="sub-detail-text">
+              元金: <span id="kpi-principal-repaid">¥0</span> / 利息: <span id="kpi-interest-repaid">¥0</span>
+            </span>
+          </div>
+          <div class="progress-bar-container">
+            <div class="progress-bar-fill" id="progress-bar-fill" style="width: 0%;"></div>
+          </div>
+        </div>
+
+        <!-- カード3: 直近の返済期限 -->
+        <div class="m3-summary-card clickable-card" id="kpi-card-due" title="クリックで直近返済期限ポップアップを表示">
+          <div class="card-header-row">
+            <span class="card-label">直近の返済期限</span>
+            <span class="countdown-tag" id="kpi-due-countdown">--</span>
+          </div>
+          <div class="card-main-val highlight-due" id="kpi-due-amount">¥0</div>
+          <div class="card-sub-info date-info-row">
+            <span class="material-symbols-outlined card-icon">event</span>
+            <span class="due-date-value" id="kpi-due-date">----/--/--</span>
+          </div>
+        </div>
+
+        <!-- カード4: 明日の利息予定額 & 免除条件 -->
+        <div class="m3-summary-card">
+          <div class="card-header-row">
+            <span class="card-label">明日の利息予定額</span>
+          </div>
+          <div class="card-main-val" id="kpi-tomorrow-interest">¥0</div>
+          <div class="card-sub-info exemption-info-row">
+            <span class="material-symbols-outlined card-icon success-icon">verified</span>
+            <span class="exemption-text-value" id="kpi-exemption-rule">直近-日に-円以上返済で免除</span>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- チャートセクション -->
+    <section class="charts-section">
+      <div class="chart-block">
+        <h2 class="section-heading">店舗別利用額</h2>
+        <div class="chart-body">
+          <canvas id="storeChart"></canvas>
+        </div>
+      </div>
+
+      <div class="chart-block">
+        <h2 class="section-heading">月別推移 (利用・入金・残額推移)</h2>
+        <div class="chart-body">
+          <canvas id="monthlyChart"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- M3 データセクション -->
+    <section class="data-section">
+      <!-- M3 Navigation Tabs -->
+      <nav class="tab-nav">
+        <button class="tab-btn active" id="tab-usage" data-tab="usage">
+          利用明細 (<span id="usage-count">0</span>)
+        </button>
+        <button class="tab-btn" id="tab-repayment" data-tab="repayment">
+          返済履歴 (<span id="repayment-count">0</span>)
+        </button>
+      </nav>
+
+      <!-- 利用明細コントロール行 -->
+      <div id="usage-controls">
+        <div class="controls-row">
+          <div class="search-input-box">
+            <span class="material-symbols-outlined">search</span>
+            <input type="text" id="search-input" placeholder="店舗名や日付で検索">
+          </div>
+
+          <div class="sort-select-box">
+            <span>並び順:</span>
+            <select id="sort-select">
+              <option value="date-asc" selected>日付 (古い順)</option>
+              <option value="date-desc">日付 (新しい順)</option>
+              <option value="amount-desc">利用額 (高い順)</option>
+              <option value="amount-asc">利用額 (安い順)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- 店舗絞り込み（M3 Checkbox Group） -->
+        <div class="store-filter-area" id="store-filter-area">
+          <div class="store-filter-header">
+            <span class="label">店舗絞り込み</span>
+            <button type="button" id="store-toggle-all-btn" class="filter-action-btn">全解除</button>
+          </div>
+          <div class="store-checkbox-list" id="store-checkbox-group">
+            <!-- JavaScriptで動的生成 -->
+          </div>
+        </div>
+      </div>
+
+      <!-- 利用明細テーブル -->
+      <div class="tab-content active" id="content-usage">
+        <div class="table-container">
+          <table class="simple-table usage-table">
+            <thead>
+              <tr>
+                <th class="col-date">利用日</th>
+                <th class="col-store">店舗名</th>
+                <th class="col-amount">利用額</th>
+                <th class="col-status">ステータス</th>
+                <th class="col-resolved">返済済額 / 残額</th>
+                <th class="col-due">返済期限</th>
+              </tr>
+            </thead>
+            <tbody id="usage-table-body">
+              <tr>
+                <td colspan="6" class="table-empty">データを読み込んでいます...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 返済履歴テーブル -->
+      <div class="tab-content" id="content-repayment">
+        <div class="table-container repayment-table-container">
+          <table class="simple-table repayment-table">
+            <thead>
+              <tr>
+                <th class="col-repay-date">返済日</th>
+                <th class="col-repay-amount">返済額</th>
+              </tr>
+            </thead>
+            <tbody id="repayment-table-body">
+              <tr>
+                <td colspan="2" class="table-empty">データを読み込んでいます...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- M3 フッター (更新時間のみ) -->
+    <footer class="main-footer">
+      <div id="last-sync-time">最終更新: 未取得</div>
+    </footer>
+
+  </div>
+
+  <!-- M3 直近返済期限ポップアップダイアログ (無駄な囲み枠を排し線分で区切る赤色基調のシンプルデザイン) -->
+  <div id="due-modal-overlay" class="m3-modal-overlay hidden" role="dialog" aria-modal="true"
+    aria-labelledby="due-modal-title">
+    <div class="m3-modal-card">
+
+      <!-- ヘッダーエリア -->
+      <div class="modal-header-row">
+        <div class="modal-title-group">
+          <span class="material-symbols-outlined modal-header-icon">event_upcoming</span>
+          <h2 id="due-modal-title" class="modal-title">直近の返済期限</h2>
+        </div>
+        <span class="countdown-tag" id="modal-due-countdown">--</span>
+      </div>
+
+      <!-- メイン情報エリア (枠線で囲まず、線分で美しく区切る) -->
+      <div class="modal-body-divided">
+
+        <!-- 区画1: 返済期日 -->
+        <div class="modal-info-col">
+          <span class="modal-info-label">返済期日</span>
+          <div class="modal-date-val" id="modal-due-date">----/--/--</div>
+        </div>
+
+        <!-- 区画2: 返済予定金額 -->
+        <div class="modal-info-col">
+          <span class="modal-info-label">返済予定金額</span>
+          <div class="modal-amount-val" id="modal-due-amount">¥0</div>
+        </div>
+
+      </div>
+
+      <!-- アクションエリア -->
+      <div class="modal-actions-row">
+        <button type="button" class="btn-modal-close" id="modal-close-btn">
+          閉じる
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Custom JavaScript -->
+  <script src="app.js?v=6"></script>
+</body>
+
+</html>

@@ -1,0 +1,1110 @@
+/* ==========================================================================
+   Material Design 3 (M3) デザインシステム
+   Google M3仕様に基づくカラーシステム・タイポグラフィ・サーフェス設計
+   要件: 過剰な囲み枠を排除し、M3のトーン配色・厳密なタイポグラフィ・余白で構築
+   ========================================================================== */
+
+:root {
+  /* M3 カラーシステム - トーンパレット */
+  --md-sys-color-surface: #fdfcff;
+  --md-sys-color-surface-dim: #ded8e1;
+  --md-sys-color-surface-container-lowest: #ffffff;
+  --md-sys-color-surface-container-low: #f7f2fa;
+  --md-sys-color-surface-container: #f3edf7;
+  --md-sys-color-surface-container-high: #ece6f0;
+
+  /* M3 テキスト & コンテンツカラー */
+  --md-sys-color-on-surface: #1d1b20;
+  --md-sys-color-on-surface-variant: #49454f;
+  --md-sys-color-outline: #79747e;
+  --md-sys-color-outline-variant: #e6e0e9;
+
+  /* M3 プライマリカラー (Google Blue) */
+  --md-sys-color-primary: #00639b;
+  --md-sys-color-on-primary: #ffffff;
+  --md-sys-color-primary-container: #cee5ff;
+  --md-sys-color-on-primary-container: #001d33;
+
+  /* M3 セカンダリ & ニュートラル */
+  --md-sys-color-secondary: #51606f;
+  --md-sys-color-secondary-container: #d5e4f6;
+  --md-sys-color-on-secondary-container: #0e1d2a;
+
+  /* M3 セマンティックステータスカラー (赤色アクセント系) */
+  --md-sys-color-success: #146c2e;
+  --md-sys-color-success-container: #c4eed0;
+  --md-sys-color-on-success: #002106;
+
+  --md-sys-color-warning: #7c5800;
+  --md-sys-color-warning-container: #ffdf9e;
+  --md-sys-color-on-warning: #261900;
+
+  --md-sys-color-error: #ba1a1a;
+  --md-sys-color-error-container: #ffdad6;
+  --md-sys-color-on-error: #410002;
+
+  /* フォントスタック (Roboto / Noto Sans JP) */
+  --font-family: 'Roboto', 'Noto Sans JP', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+  /* M3 イージング */
+  --md-sys-motion-easing-standard: cubic-bezier(0.2, 0, 0, 1);
+  --md-sys-motion-duration-short: 150ms;
+}
+
+/* リセット */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background-color: var(--md-sys-color-surface);
+  color: var(--md-sys-color-on-surface);
+  font-family: var(--font-family);
+  min-height: 100vh;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+.app-container {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 28px 24px 60px 24px;
+}
+
+/* ==========================================================================
+   M3 Top App Bar (トップアプリケーションバー)
+   ========================================================================== */
+
+.main-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+  margin-bottom: 20px;
+}
+
+.header-branding h1 {
+  font-size: 1.5rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--md-sys-color-on-surface);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+/* M3 ステータスインジケーター */
+.status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--md-sys-color-success);
+}
+
+/* M3 Button (Tonal) */
+.btn-refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background-color: var(--md-sys-color-surface-container-high);
+  border: none;
+  color: var(--md-sys-color-primary);
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color var(--md-sys-motion-duration-short) var(--md-sys-motion-easing-standard);
+}
+
+.btn-refresh:hover {
+  background-color: var(--md-sys-color-surface-dim);
+}
+
+.btn-refresh .material-symbols-outlined {
+  font-size: 18px;
+}
+
+/* ==========================================================================
+   M3 Banner / Inline Message
+   ========================================================================== */
+
+.inline-alert {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: var(--md-sys-color-surface-container-low);
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+  padding: 8px 14px;
+  margin-bottom: 18px;
+  font-size: 0.875rem;
+}
+
+.inline-alert.hidden {
+  display: none;
+}
+
+.inline-alert.error {
+  background-color: var(--md-sys-color-error-container);
+  color: var(--md-sys-color-on-error);
+}
+
+.inline-alert.success {
+  background-color: var(--md-sys-color-success-container);
+  color: var(--md-sys-color-on-success);
+}
+
+.alert-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.alert-title {
+  font-weight: 600;
+}
+
+.alert-close {
+  background: transparent;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+}
+
+/* ==========================================================================
+   M3 サマリーセクション (Google Material Design 3 ディバイダーレイアウト)
+   要件: AI風の囲み枠を排除し、M3の仕切り線 (Dividers) でエリア分け
+   ========================================================================== */
+
+.summary-section {
+  margin-bottom: 24px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+}
+
+.summary-container {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0;
+  align-items: stretch;
+}
+
+/* 各サマリーエリア (囲み枠・カード背景・影は完全排除しフラットに配置) */
+.m3-summary-card {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 4px 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 98px;
+  /* エリア間の垂直仕切り線 (M3 Vertical Divider) */
+  border-right: 1px solid var(--md-sys-color-outline-variant);
+  transition: background-color var(--md-sys-motion-duration-short);
+}
+
+.m3-summary-card.clickable-card {
+  cursor: pointer;
+}
+
+.m3-summary-card.clickable-card:hover {
+  background-color: var(--md-sys-color-surface-container-low);
+  border-radius: 8px;
+}
+
+/* 最初のエリアは左端の余白を詰め、最後のエリアは右端仕切り線不要 */
+.m3-summary-card:first-child {
+  padding-left: 0;
+}
+
+.m3-summary-card:last-child {
+  border-right: none;
+  padding-right: 0;
+}
+
+/* カードヘッダー（ラベル + バッジ） */
+.card-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.card-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--md-sys-color-on-surface-variant);
+  letter-spacing: 0.01em;
+}
+
+/* 件数バッジ: 数値と上下中央揃え */
+.summary-count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--md-sys-color-secondary);
+  background-color: var(--md-sys-color-surface-container-high);
+  padding: 2px 8px;
+  border-radius: 10px;
+  line-height: 1;
+}
+
+/* メイン数値表示 */
+.card-main-val {
+  font-size: 1.375rem;
+  font-weight: 700;
+  color: var(--md-sys-color-on-surface);
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+  margin-bottom: 4px;
+}
+
+.card-main-val.highlight-due {
+  color: var(--md-sys-color-error);
+}
+
+/* カード下部・補足情報行 */
+.card-sub-info {
+  display: flex;
+  align-items: center;
+  font-size: 0.75rem;
+  color: var(--md-sys-color-on-surface-variant);
+  gap: 6px;
+  min-height: 20px;
+}
+
+.card-sub-info .sub-label {
+  font-weight: 500;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.card-sub-info .sub-val.highlight-balance {
+  font-weight: 700;
+  color: var(--md-sys-color-error);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.875rem;
+}
+
+.sub-detail-text {
+  font-size: 0.6875rem;
+  color: var(--md-sys-color-on-surface-variant);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.sub-detail-text span {
+  font-weight: 600;
+  color: var(--md-sys-color-on-surface);
+}
+
+/* 返済率バッジ & プログレスバー */
+.rate-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.rate-label {
+  font-size: 0.6875rem;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.rate-value-text {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--md-sys-color-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.progress-bar-container {
+  width: 100%;
+  height: 4px;
+  background-color: var(--md-sys-color-surface-container-high);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 6px;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background-color: var(--md-sys-color-primary);
+  border-radius: 2px;
+  transition: width 0.4s var(--md-sys-motion-easing-standard);
+}
+
+/* カウントダウンバッジ (M3 Tonal Badge - 赤系アクセント対応) */
+.countdown-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background-color: var(--md-sys-color-error-container);
+  color: var(--md-sys-color-on-error);
+  line-height: 1.2;
+}
+
+.countdown-tag.overdue {
+  background-color: var(--md-sys-color-error);
+  color: #ffffff;
+}
+
+.countdown-tag.imminent {
+  background-color: var(--md-sys-color-warning-container);
+  color: var(--md-sys-color-on-warning);
+}
+
+/* カードアイコンと期日・免除条件 */
+.card-icon {
+  font-size: 16px;
+  color: var(--md-sys-color-on-surface-variant);
+  flex-shrink: 0;
+}
+
+.card-icon.success-icon {
+  color: var(--md-sys-color-success);
+}
+
+.due-date-value {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--md-sys-color-on-surface);
+  font-variant-numeric: tabular-nums;
+}
+
+.exemption-text-value {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--md-sys-color-success);
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ==========================================================================
+   M3 Charts Section
+   ========================================================================== */
+
+.charts-section {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 28px;
+  margin-bottom: 28px;
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+  padding-bottom: 24px;
+}
+
+.chart-block {
+  display: flex;
+  flex-direction: column;
+}
+
+.section-heading {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--md-sys-color-on-surface);
+  margin-bottom: 12px;
+}
+
+.chart-body {
+  height: 220px;
+  position: relative;
+}
+
+/* ==========================================================================
+   M3 Data Section (Navigation Tabs / Controls / Table)
+   ========================================================================== */
+
+.data-section {
+  margin-bottom: 28px;
+}
+
+/* M3 Primary Navigation Tabs */
+.tab-nav {
+  display: flex;
+  gap: 28px;
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+  margin-bottom: 16px;
+  position: relative;
+}
+
+.tab-btn {
+  background: transparent;
+  border: none;
+  padding: 8px 4px;
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--md-sys-color-on-surface-variant);
+  cursor: pointer;
+  position: relative;
+  transition: color var(--md-sys-motion-duration-short) var(--md-sys-motion-easing-standard);
+}
+
+.tab-btn:hover {
+  color: var(--md-sys-color-on-surface);
+}
+
+.tab-btn.active {
+  color: var(--md-sys-color-primary);
+  font-weight: 600;
+}
+
+/* M3 Tab Indicator */
+.tab-btn.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background-color: var(--md-sys-color-primary);
+  border-top-left-radius: 3px;
+  border-top-right-radius: 3px;
+}
+
+/* M3 Controls Row */
+.controls-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+/* M3 Search Input (Docked / Flat Style) */
+.search-input-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background-color: var(--md-sys-color-surface-container-high);
+  border-radius: 24px;
+  padding: 5px 14px;
+  width: 240px;
+  transition: background-color var(--md-sys-motion-duration-short) var(--md-sys-motion-easing-standard);
+}
+
+.search-input-box:focus-within {
+  background-color: var(--md-sys-color-surface-container-low);
+  outline: 1px solid var(--md-sys-color-primary);
+}
+
+.search-input-box input {
+  background: transparent;
+  border: none;
+  font-family: inherit;
+  font-size: 0.8125rem;
+  color: var(--md-sys-color-on-surface);
+  outline: none;
+  width: 100%;
+}
+
+.search-input-box input::placeholder {
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.search-input-box .material-symbols-outlined {
+  font-size: 18px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+/* M3 Sort Select */
+.sort-select-box {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8125rem;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.sort-select-box select {
+  background-color: var(--md-sys-color-surface);
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-family: inherit;
+  font-size: 0.8125rem;
+  color: var(--md-sys-color-on-surface);
+  outline: none;
+  cursor: pointer;
+}
+
+.sort-select-box select:focus {
+  border-color: var(--md-sys-color-primary);
+}
+
+/* M3 Filter Chips (店舗絞り込み) */
+.store-filter-area {
+  margin-bottom: 16px;
+  padding: 10px 0;
+  border-top: 1px solid var(--md-sys-color-outline-variant);
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+}
+
+.store-filter-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.8125rem;
+  color: var(--md-sys-color-on-surface-variant);
+  margin-bottom: 6px;
+}
+
+.store-filter-header .label {
+  font-weight: 500;
+  color: var(--md-sys-color-on-surface);
+}
+
+.filter-action-btn {
+  background: transparent;
+  border: none;
+  color: var(--md-sys-color-primary);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.filter-action-btn:hover {
+  text-decoration: underline;
+}
+
+.store-checkbox-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+/* M3 Checkbox Label */
+.store-checkbox-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8125rem;
+  color: var(--md-sys-color-on-surface);
+  cursor: pointer;
+  user-select: none;
+}
+
+.store-checkbox-label input[type="checkbox"] {
+  accent-color: var(--md-sys-color-primary);
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+}
+
+/* ==========================================================================
+   M3 Data Table (各列のバランス良い横位置アライメント)
+   ========================================================================== */
+
+.table-container {
+  overflow-x: auto;
+  margin-bottom: 20px;
+}
+
+.simple-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.simple-table th {
+  font-weight: 500;
+  color: var(--md-sys-color-on-surface-variant);
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+  white-space: nowrap;
+  font-size: 0.75rem;
+  letter-spacing: 0.02em;
+}
+
+.simple-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+  color: var(--md-sys-color-on-surface);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  transition: background-color var(--md-sys-motion-duration-short);
+}
+
+.simple-table tbody tr:hover td {
+  background-color: var(--md-sys-color-surface-container-low);
+}
+
+.text-right {
+  text-align: right;
+}
+
+.table-empty {
+  text-align: center;
+  padding: 36px !important;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+/* --- 利用明細テーブルの各列アライメント --- */
+.usage-table th.col-date,
+.usage-table td:nth-child(1) {
+  text-align: center;
+  width: 105px;
+}
+
+.usage-table th.col-store,
+.usage-table td:nth-child(2) {
+  text-align: left;
+}
+
+.usage-table th.col-amount,
+.usage-table td:nth-child(3) {
+  text-align: right;
+  width: 105px;
+}
+
+.usage-table th.col-status,
+.usage-table td:nth-child(4) {
+  text-align: center;
+  width: 120px;
+}
+
+.usage-table th.col-resolved,
+.usage-table td:nth-child(5) {
+  text-align: center;
+  width: 170px;
+}
+
+.usage-table th.col-due,
+.usage-table td:nth-child(6) {
+  text-align: center;
+  width: 110px;
+}
+
+/* --- 返済履歴テーブルの各列アライメント --- */
+.repayment-table-container {
+  max-width: 480px;
+}
+
+.repayment-table th.col-repay-date,
+.repayment-table td:nth-child(1) {
+  text-align: center;
+  width: 50%;
+}
+
+.repayment-table th.col-repay-amount,
+.repayment-table td:nth-child(2) {
+  text-align: right;
+  width: 50%;
+}
+
+/* M3 Status Indicators */
+.status-indicator-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.status-indicator-text .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.status-indicator-text.paid {
+  color: var(--md-sys-color-success);
+}
+
+.status-indicator-text.paid .dot {
+  background-color: var(--md-sys-color-success);
+}
+
+.status-indicator-text.partial {
+  color: var(--md-sys-color-warning);
+}
+
+.status-indicator-text.partial .dot {
+  background-color: var(--md-sys-color-warning);
+}
+
+.status-indicator-text.unpaid {
+  color: var(--md-sys-color-error);
+}
+
+.status-indicator-text.unpaid .dot {
+  background-color: var(--md-sys-color-error);
+}
+
+/* 一部返済詳細 */
+.partial-amount-info {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.partial-amount-info .paid-part {
+  color: var(--md-sys-color-success);
+  font-weight: 500;
+}
+
+.partial-amount-info .remain-part {
+  color: var(--md-sys-color-error);
+  font-weight: 500;
+}
+
+.partial-amount-info .slash {
+  color: var(--md-sys-color-outline);
+}
+
+/* 返済期限表示セル */
+.due-date-cell {
+  font-size: 0.8125rem;
+  color: var(--md-sys-color-on-surface-variant);
+  font-variant-numeric: tabular-nums;
+}
+
+.due-date-cell.highlight-due {
+  color: var(--md-sys-color-error);
+  font-weight: 500;
+}
+
+/* ==========================================================================
+   M3 Modal Dialog (赤色基調・無駄な囲み枠を排し線分で区切るシンプルデザイン)
+   ========================================================================== */
+
+.m3-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.m3-modal-overlay.hidden {
+  display: none !important;
+}
+
+/* モーダルカード: 画面サイズに応じて多少の余白を残し、ゆったり大きめに表示 */
+.m3-modal-card {
+  background-color: var(--md-sys-color-surface-container-lowest);
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: 16px;
+  padding: 28px 32px;
+  width: min(calc(100vw - 40px), 560px);
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+  display: flex;
+  flex-direction: column;
+}
+
+/* ヘッダー行: 下側に水平線分 */
+.modal-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+  margin-bottom: 24px;
+}
+
+.modal-title-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.modal-header-icon {
+  font-size: 24px;
+  color: var(--md-sys-color-error);
+}
+
+.modal-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--md-sys-color-error);
+  letter-spacing: -0.01em;
+}
+
+/* メイン情報エリア: サマリーエリアと同様、枠線で囲まず線分で美しく区切る */
+.modal-body-divided {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  align-items: stretch;
+}
+
+/* 各区画 (枠線・背景・影は完全排除しフラットに配置) */
+.modal-info-col {
+  background: transparent;
+  border: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 0 24px;
+}
+
+/* 1列目は左端余白を詰め、右側に垂直仕切り線 (M3 Vertical Divider) */
+.modal-info-col:first-child {
+  padding-left: 0;
+  border-right: 1px solid var(--md-sys-color-outline-variant);
+}
+
+/* 2列目は右端余白を詰める */
+.modal-info-col:last-child {
+  padding-right: 0;
+}
+
+.modal-info-label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--md-sys-color-on-surface-variant);
+  margin-bottom: 8px;
+}
+
+.modal-date-val {
+  font-size: 1.375rem;
+  font-weight: 700;
+  color: var(--md-sys-color-on-surface);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.modal-amount-val {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--md-sys-color-error);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+/* アクション行: 上側に水平線分 */
+.modal-actions-row {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 20px;
+  border-top: 1px solid var(--md-sys-color-outline-variant);
+  margin-top: 24px;
+}
+
+/* 赤色基調のM3クローズボタン */
+.btn-modal-close {
+  background-color: var(--md-sys-color-error);
+  color: #ffffff;
+  border: none;
+  border-radius: 20px;
+  padding: 8px 26px;
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--md-sys-motion-duration-short) var(--md-sys-motion-easing-standard);
+}
+
+.btn-modal-close:hover {
+  background-color: #93000a;
+}
+
+/* ==========================================================================
+   M3 Footer (更新時間のみ)
+   ========================================================================== */
+
+.main-footer {
+  margin-top: 24px;
+  padding-top: 14px;
+  border-top: 1px solid var(--md-sys-color-outline-variant);
+  font-size: 0.75rem;
+  color: var(--md-sys-color-on-surface-variant);
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+/* タブコンテンツ制御 */
+.tab-content {
+  display: none;
+}
+
+.tab-content.active {
+  display: block;
+}
+
+/* ==========================================================================
+   レスポンシブ設計 (縦横比判定によるスマホ・ポートレート最適化)
+   ========================================================================== */
+
+@media (orientation: portrait),
+(max-aspect-ratio: 1/1) {
+  .app-container {
+    padding: 16px 14px 40px 14px;
+  }
+
+  .main-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .header-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  /* サマリー全体を2×2グリッドに配置し、中央の十字仕切り線でエリア分け */
+  .summary-container {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0;
+  }
+
+  .m3-summary-card {
+    padding: 10px 14px;
+    min-height: 94px;
+    border-right: none;
+    border-bottom: none;
+  }
+
+  /* 奇数番目（左カラム）の右側に垂直仕切り線 */
+  .m3-summary-card:nth-child(odd) {
+    border-right: 1px solid var(--md-sys-color-outline-variant);
+    padding-left: 0;
+    padding-right: 14px;
+  }
+
+  /* 偶数番目（右カラム）の左右パディング */
+  .m3-summary-card:nth-child(even) {
+    padding-left: 14px;
+    padding-right: 0;
+  }
+
+  /* 上段2要素（1行目）の下側に水平仕切り線 */
+  .m3-summary-card:nth-child(-n+2) {
+    border-bottom: 1px solid var(--md-sys-color-outline-variant);
+    padding-bottom: 12px;
+  }
+
+  /* 下段2要素（2行目）の上パディング */
+  .m3-summary-card:nth-child(n+3) {
+    padding-top: 12px;
+  }
+
+  .card-main-val {
+    font-size: 1.1875rem;
+  }
+
+  .sub-detail-text {
+    font-size: 0.625rem;
+  }
+
+  .exemption-text-value {
+    font-size: 0.6875rem;
+  }
+
+  /* チャートを1カラムに */
+  .charts-section {
+    grid-template-columns: 1fr;
+    gap: 20px;
+    margin-bottom: 20px;
+    padding-bottom: 20px;
+  }
+
+  .chart-body {
+    height: 190px;
+  }
+
+  /* コントロール行の最適化 */
+  .controls-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .search-input-box {
+    width: 100%;
+  }
+
+  .sort-select-box {
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .sort-select-box select {
+    flex: 1;
+  }
+
+  .store-checkbox-list {
+    gap: 6px 12px;
+  }
+
+  .repayment-table-container {
+    max-width: 100%;
+  }
+
+  /* スマホでのポップアップ表示 (無駄な囲み枠なく線分で上下分割) */
+  .m3-modal-card {
+    width: calc(100vw - 24px);
+    padding: 20px 18px;
+  }
+
+  .modal-title {
+    font-size: 1.125rem;
+  }
+
+  .modal-body-divided {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .modal-info-col {
+    padding: 0;
+  }
+
+  .modal-info-col:first-child {
+    border-right: none;
+    border-bottom: 1px solid var(--md-sys-color-outline-variant);
+    padding-bottom: 16px;
+    margin-bottom: 16px;
+  }
+
+  .modal-date-val {
+    font-size: 1.25rem;
+  }
+
+  .modal-amount-val {
+    font-size: 1.75rem;
+  }
+}
