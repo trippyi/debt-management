@@ -17,7 +17,7 @@
   <!-- Chart.js CDN -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <!-- Custom CSS -->
-  <link rel="stylesheet" href="style.css?v=6">
+  <link rel="stylesheet" href="style.css?v=7">
 </head>
 
 <body>
@@ -178,7 +178,11 @@
 
       <!-- 利用明細テーブル -->
       <div class="tab-content active" id="content-usage">
-        <div class="table-container">
+        <div class="scroll-hint" id="usage-scroll-hint">
+          <span class="material-symbols-outlined scroll-hint-icon">swap_horiz</span>
+          <span class="scroll-hint-text">左右にスクロールできます</span>
+        </div>
+        <div class="table-container" id="usage-table-container">
           <table class="simple-table usage-table">
             <thead>
               <tr>
@@ -201,7 +205,11 @@
 
       <!-- 返済履歴テーブル -->
       <div class="tab-content" id="content-repayment">
-        <div class="table-container repayment-table-container">
+        <div class="scroll-hint" id="repayment-scroll-hint">
+          <span class="material-symbols-outlined scroll-hint-icon">swap_horiz</span>
+          <span class="scroll-hint-text">左右にスクロールできます</span>
+        </div>
+        <div class="table-container repayment-table-container" id="repayment-table-container">
           <table class="simple-table repayment-table">
             <thead>
               <tr>
@@ -268,7 +276,7 @@
   </div>
 
   <!-- Custom JavaScript -->
-  <script src="app.js?v=6"></script>
+  <script src="app.js?v=7"></script>
 </body>
 
 </html>

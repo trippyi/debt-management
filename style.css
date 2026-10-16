@@ -623,14 +623,22 @@ body {
    ========================================================================== */
 
 .table-container {
-  overflow-x: auto;
+  overflow: auto;
+  max-height: 60vh;
   margin-bottom: 20px;
+  position: relative;
 }
 
 .simple-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.875rem;
+}
+
+.simple-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 2;
 }
 
 .simple-table th {
@@ -641,6 +649,7 @@ body {
   white-space: nowrap;
   font-size: 0.75rem;
   letter-spacing: 0.02em;
+  background-color: var(--md-sys-color-surface);
 }
 
 .simple-table td {
@@ -937,6 +946,34 @@ body {
 
 .btn-modal-close:hover {
   background-color: #93000a;
+}
+
+/* ==========================================================================
+   スクロールヒント（横スクロールが必要な場合のみ常時表示）
+   ========================================================================== */
+
+.scroll-hint {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 0;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.scroll-hint.visible {
+  display: flex;
+}
+
+.scroll-hint-icon {
+  font-size: 18px;
+  color: var(--md-sys-color-outline);
+}
+
+.scroll-hint-text {
+  letter-spacing: 0.02em;
 }
 
 /* ==========================================================================

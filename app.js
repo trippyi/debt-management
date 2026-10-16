@@ -145,6 +145,12 @@ function setupEventListeners() {
       showDueModal();
     });
   }
+
+  // ウィンドウリサイズ時にスクロールヒント判定を再実行
+  window.addEventListener('resize', () => {
+    checkScrollHint('usage-table-container', 'usage-scroll-hint');
+    checkScrollHint('repayment-table-container', 'repayment-scroll-hint');
+  });
 }
 
 /**
@@ -792,6 +798,9 @@ function renderUsageTable() {
   });
 
   tbody.innerHTML = html;
+
+  // テーブル描画後にスクロールヒント判定
+  checkScrollHint('usage-table-container', 'usage-scroll-hint');
 }
 
 /**
@@ -823,6 +832,9 @@ function renderRepaymentTable() {
   });
 
   tbody.innerHTML = html;
+
+  // テーブル描画後にスクロールヒント判定
+  checkScrollHint('repayment-table-container', 'repayment-scroll-hint');
 }
 
 /**
@@ -1170,4 +1182,24 @@ function escapeHTML(str) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+/**
+ * テーブルの横スクロールが必要かどうかを判定し、必要な場合のみスクロールヒントを表示→フェードアウト
+ * @param {string} containerId - テーブルコンテナのID
+ * @param {string} hintId - スクロールヒント要素のID
+ */
+function checkScrollHint(containerId, hintId) {
+  const container = document.getElementById(containerId);
+  const hint = document.getElementById(hintId);
+  if (!container || !hint) return;
+
+  // 横スクロールが必要かどうか判定（テーブル内容がコンテナの幅を超えている場合）
+  const needsScroll = container.scrollWidth > container.clientWidth + 2;
+
+  if (needsScroll) {
+    hint.classList.add('visible');
+  } else {
+    hint.classList.remove('visible');
+  }
 }
