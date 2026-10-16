@@ -665,6 +665,10 @@ body {
   background-color: var(--md-sys-color-surface-container-low);
 }
 
+.simple-table tbody tr:hover td:nth-child(1) {
+  background-color: var(--md-sys-color-surface-container-low);
+}
+
 .text-right {
   text-align: right;
 }
@@ -680,6 +684,15 @@ body {
 .usage-table td:nth-child(1) {
   text-align: center;
   width: 105px;
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background-color: var(--md-sys-color-surface);
+}
+
+/* theadの1列目は縦横両方のstickyが重なるため最前面に */
+.usage-table th.col-date {
+  z-index: 3;
 }
 
 .usage-table th.col-store,
@@ -720,6 +733,14 @@ body {
 .repayment-table td:nth-child(1) {
   text-align: center;
   width: 50%;
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background-color: var(--md-sys-color-surface);
+}
+
+.repayment-table th.col-repay-date {
+  z-index: 3;
 }
 
 .repayment-table th.col-repay-amount,
