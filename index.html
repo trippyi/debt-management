@@ -17,7 +17,7 @@
   <!-- Chart.js CDN -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <!-- Custom CSS -->
-  <link rel="stylesheet" href="style.css?v=7">
+  <link rel="stylesheet" href="style.css?v=9">
 </head>
 
 <body>
@@ -55,13 +55,16 @@
     <section class="summary-section">
       <div class="summary-container">
 
-        <!-- カード1: 総利用額 & 残額 -->
+        <!-- カード1: 総利用額 (利息込み総返済額を括弧書き併記) & 残額 -->
         <div class="m3-summary-card">
           <div class="card-header-row">
             <span class="card-label">総利用額</span>
             <span class="summary-count-badge" id="kpi-count-used">0件</span>
           </div>
-          <div class="card-main-val" id="kpi-total-used">¥0</div>
+          <div class="card-main-val">
+            <span id="kpi-total-used">¥0</span>
+            <span class="total-with-interest" id="kpi-total-with-interest">(¥0)</span>
+          </div>
           <div class="card-sub-info">
             <span class="sub-label">残額:</span>
             <span class="sub-val highlight-balance" id="kpi-balance">¥0</span>
@@ -88,28 +91,91 @@
           </div>
         </div>
 
-        <!-- カード3: 直近の返済期限 -->
+        <!-- カード3: 直近の返済期限 (超過がある場合は2段表示) -->
         <div class="m3-summary-card clickable-card" id="kpi-card-due" title="クリックで直近返済期限ポップアップを表示">
-          <div class="card-header-row">
-            <span class="card-label">直近の返済期限</span>
-            <span class="countdown-tag" id="kpi-due-countdown">--</span>
+          <!-- 1段表示用コンテナ (超過なし) -->
+          <div id="due-single-container">
+            <div class="card-header-row">
+              <span class="card-label">直近の返済期限</span>
+              <span class="countdown-tag" id="kpi-due-countdown">--</span>
+            </div>
+            <div class="card-main-val highlight-due" id="kpi-due-amount">¥0</div>
+            <div class="card-sub-info date-info-row">
+              <span class="material-symbols-outlined card-icon">event</span>
+              <span class="due-date-value" id="kpi-due-date">----/--/--</span>
+            </div>
           </div>
-          <div class="card-main-val highlight-due" id="kpi-due-amount">¥0</div>
-          <div class="card-sub-info date-info-row">
-            <span class="material-symbols-outlined card-icon">event</span>
-            <span class="due-date-value" id="kpi-due-date">----/--/--</span>
+
+          <!-- 2段表示用コンテナ (超過あり) -->
+          <div id="due-multi-container" class="due-multi-container hidden">
+            <div class="card-header-row">
+              <span class="card-label">直近の返済期限</span>
+            </div>
+            <!-- 上の段: 超過分 (返済額、超過日数、返済期限日) -->
+            <div class="due-tier-item tier-overdue">
+              <div class="tier-top-line">
+                <span class="tier-amount highlight-due" id="kpi-tier-overdue-amount">¥0</span>
+                <span class="countdown-tag overdue" id="kpi-tier-overdue-days">-日 超過</span>
+              </div>
+              <div class="tier-date-line">
+                <span class="tier-badge overdue-badge">期日</span>
+                <span class="tier-date-text" id="kpi-tier-overdue-date">----/--/--</span>
+              </div>
+            </div>
+
+            <div class="tier-divider"></div>
+
+            <!-- 下の段: 次の期限分 (返済額、あと何日、返済期限日) -->
+            <div class="due-tier-item tier-upcoming">
+              <div class="tier-top-line">
+                <span class="tier-amount" id="kpi-tier-upcoming-amount">¥0</span>
+                <span class="countdown-tag" id="kpi-tier-upcoming-days">あと - 日</span>
+              </div>
+              <div class="tier-date-line">
+                <span class="tier-badge upcoming-badge">次回</span>
+                <span class="tier-date-text" id="kpi-tier-upcoming-date">----/--/--</span>
+              </div>
+            </div>
           </div>
         </div>
 
-        <!-- カード4: 明日の利息予定額 & 免除条件 -->
-        <div class="m3-summary-card">
-          <div class="card-header-row">
-            <span class="card-label">明日の利息予定額</span>
+        <!-- カード4: 明日の利息予定額 & 免除条件 (超過がある場合は2段表示) -->
+        <div class="m3-summary-card" id="kpi-card-tomorrow">
+          <!-- 1段表示用コンテナ (超過なし) -->
+          <div id="tomorrow-single-container">
+            <div class="card-header-row">
+              <span class="card-label">明日の利息予定額</span>
+            </div>
+            <div class="card-main-val" id="kpi-tomorrow-interest">¥0</div>
+            <div class="card-sub-info exemption-info-row">
+              <span class="material-symbols-outlined card-icon success-icon">verified</span>
+              <span class="exemption-text-value" id="kpi-exemption-rule">直近-日に-円以上返済で免除</span>
+            </div>
           </div>
-          <div class="card-main-val" id="kpi-tomorrow-interest">¥0</div>
-          <div class="card-sub-info exemption-info-row">
-            <span class="material-symbols-outlined card-icon success-icon">verified</span>
-            <span class="exemption-text-value" id="kpi-exemption-rule">直近-日に-円以上返済で免除</span>
+
+          <!-- 2段表示用コンテナ (超過あり) -->
+          <div id="tomorrow-multi-container" class="tomorrow-multi-container hidden">
+            <div class="card-header-row">
+              <span class="card-label">明日の利息予定額</span>
+            </div>
+            <!-- 2段利息表示 -->
+            <div class="tomorrow-tiers-box">
+              <div class="tomorrow-tier-row">
+                <span class="tomorrow-rate-label">通常金利 (<span id="kpi-normal-rate">20.00%</span>):</span>
+                <span class="tomorrow-tier-val" id="kpi-tomorrow-normal-interest">¥0</span>
+              </div>
+              <div class="tomorrow-tier-row overdue-interest-row">
+                <span class="tomorrow-rate-label">超過金利 (<span id="kpi-overdue-rate">29.40%</span>):</span>
+                <span class="tomorrow-tier-val highlight-due" id="kpi-tomorrow-overdue-interest">¥0</span>
+              </div>
+            </div>
+            <div class="card-sub-info exemption-info-row multiline-exemption">
+              <span class="material-symbols-outlined card-icon success-icon">verified</span>
+              <div class="exemption-text-box">
+                <span class="exemption-text-value" id="kpi-exemption-rule-multi">直近-日に-円以上返済で免除</span>
+                <span class="exemption-disclaimer">※超過分は利息免除ルールの対象外</span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -234,7 +300,7 @@
 
   </div>
 
-  <!-- M3 直近返済期限ポップアップダイアログ (無駄な囲み枠を排し線分で区切る赤色基調のシンプルデザイン) -->
+  <!-- M3 直近返済期限ポップアップダイアログ (超過時は2段表示) -->
   <div id="due-modal-overlay" class="m3-modal-overlay hidden" role="dialog" aria-modal="true"
     aria-labelledby="due-modal-title">
     <div class="m3-modal-card">
@@ -245,12 +311,12 @@
           <span class="material-symbols-outlined modal-header-icon">event_upcoming</span>
           <h2 id="due-modal-title" class="modal-title">直近の返済期限</h2>
         </div>
+        <!-- 1段表示時のみ表示される全体バッジ（超過2段時は削除・非表示） -->
         <span class="countdown-tag" id="modal-due-countdown">--</span>
       </div>
 
-      <!-- メイン情報エリア (枠線で囲まず、線分で美しく区切る) -->
-      <div class="modal-body-divided">
-
+      <!-- メイン情報エリア (1段表示: 超過なし) -->
+      <div class="modal-body-divided" id="modal-body-single">
         <!-- 区画1: 返済期日 -->
         <div class="modal-info-col">
           <span class="modal-info-label">返済期日</span>
@@ -262,7 +328,47 @@
           <span class="modal-info-label">返済予定金額</span>
           <div class="modal-amount-val" id="modal-due-amount">¥0</div>
         </div>
+      </div>
 
+      <!-- メイン情報エリア (2段表示: 超過あり) -->
+      <div class="modal-body-multi hidden" id="modal-body-multi">
+        <!-- 上の段: 期限超過分 (返済額、超過日数、返済期限日) -->
+        <div class="modal-tier-block modal-tier-overdue">
+          <div class="modal-tier-header">
+            <span class="modal-tier-title">期限超過分</span>
+            <span class="countdown-tag overdue" id="modal-tier-overdue-countdown">-日 超過</span>
+          </div>
+          <div class="modal-tier-grid">
+            <div class="modal-info-col">
+              <span class="modal-info-label">返済期日</span>
+              <div class="modal-date-val highlight-due" id="modal-tier-overdue-date">----/--/--</div>
+            </div>
+            <div class="modal-info-col">
+              <span class="modal-info-label">返済額</span>
+              <div class="modal-amount-val" id="modal-tier-overdue-amount">¥0</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-tier-divider"></div>
+
+        <!-- 下の段: 次回期限分 (返済額、あと何日、返済期限日) -->
+        <div class="modal-tier-block modal-tier-upcoming">
+          <div class="modal-tier-header">
+            <span class="modal-tier-title">次回期限分</span>
+            <span class="countdown-tag" id="modal-tier-upcoming-countdown">あと - 日</span>
+          </div>
+          <div class="modal-tier-grid">
+            <div class="modal-info-col">
+              <span class="modal-info-label">返済期日</span>
+              <div class="modal-date-val" id="modal-tier-upcoming-date">----/--/--</div>
+            </div>
+            <div class="modal-info-col">
+              <span class="modal-info-label">返済額</span>
+              <div class="modal-amount-val modal-amount-upcoming" id="modal-tier-upcoming-amount">¥0</div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- アクションエリア -->
@@ -276,7 +382,7 @@
   </div>
 
   <!-- Custom JavaScript -->
-  <script src="app.js?v=7"></script>
+  <script src="app.js?v=9"></script>
 </body>
 
 </html>

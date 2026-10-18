@@ -15,11 +15,18 @@ const state = {
     interestRepaid: 0,
     balance: 0,
     totalInterest: 0,
+    totalOverdueInterest: 0,
     repayRate: 0,
     tomorrowInterest: 0,
+    tomorrowNormalInterest: 0,
+    tomorrowOverdueInterest: 0,
     exemptionDays: '0',
     exemptionAmount: 0,
-    interestRate: '0%',
+    normalInterestRate: '20.00%',
+    overdueInterestRate: '29.40%',
+    hasOverdue: false,
+    overdueInfo: null,
+    upcomingInfo: null,
     nextDue: {
       date: '-',
       amount: 0,
@@ -188,6 +195,7 @@ async function fetchData() {
 
 /**
  * CSVテキストをパースしてデータオブジェクトを生成
+ * 超過金利制度導入に伴う新列マッピングに対応
  * @param {string} csvText - 取得したCSV文字列
  */
 function parseCSVData(csvText) {
@@ -198,18 +206,20 @@ function parseCSVData(csvText) {
 
   let summaryFound = false;
 
-  // 明細カラムの動的マッピング用変数（B列追加後のデフォルトインデックス）
+  // 明細カラムの動的マッピング用変数（超過利息列追加後のデフォルトインデックス）
   let detailColMap = {
     usageDate: 0,
     dueDate: 1,
     store: 2,
     amount: 3,
+    interestStartDate: 4,
     resolvedAmount: 5,
     interest: 6,
-    balanceTotal: 7,
-    isPaid: 8,
-    repayDate: 9,
-    repayAmount: 10
+    overdueInterest: 7,
+    balanceTotal: 8,
+    isPaid: 9,
+    repayDate: 10,
+    repayAmount: 11
   };
 
   for (let i = 0; i < lines.length; i++) {
@@ -219,16 +229,27 @@ function parseCSVData(csvText) {
     if (cols.includes('総利用額')) {
       const nextLine = lines[i + 1] ? parseCSVLine(lines[i + 1]) : [];
       
+      const idxNormalRate = cols.indexOf('金利');
+      const idxOverdueRate = cols.indexOf('超過金利');
       const idxTotalUsed = cols.indexOf('総利用額');
-      const idxAmount = cols.indexOf('金額');
       const idxPrincipalRepaid = cols.indexOf('元金返済額');
       const idxBalance = cols.indexOf('残額');
       const idxInterest = cols.indexOf('利息合計');
+      const idxOverdueInterest = cols.indexOf('超過利息合計');
       const idxRepayRate = cols.indexOf('返済率');
       const idxTomorrow = cols.indexOf('明日の利息');
       const idxExemption = cols.indexOf('免除ルール(日数)');
-      const idxInterestRate = cols.indexOf('金利');
+      const idxAmount = cols.indexOf('金額');
 
+      // 金利の取得
+      if (idxNormalRate !== -1 && nextLine[idxNormalRate] !== undefined && nextLine[idxNormalRate] !== '') {
+        state.summary.normalInterestRate = nextLine[idxNormalRate];
+      }
+      if (idxOverdueRate !== -1 && nextLine[idxOverdueRate] !== undefined && nextLine[idxOverdueRate] !== '') {
+        state.summary.overdueInterestRate = nextLine[idxOverdueRate];
+      }
+
+      // 総利用額 (D2)
       if (idxTotalUsed !== -1 && nextLine[idxTotalUsed] !== undefined) {
         state.summary.totalUsed = parseNumber(nextLine[idxTotalUsed]);
       }
@@ -245,38 +266,39 @@ function parseCSVData(csvText) {
         state.summary.principalRepaid = parseNumber(nextLine[idxPrincipalRepaid]);
       }
 
-      // 利息合計
+      // 残額
+      if (idxBalance !== -1 && nextLine[idxBalance] !== undefined) {
+        state.summary.balance = parseNumber(nextLine[idxBalance]);
+      }
+
+      // 利息合計 (G2)
       if (idxInterest !== -1 && nextLine[idxInterest] !== undefined) {
         state.summary.totalInterest = parseNumber(nextLine[idxInterest]);
+      }
+
+      // 超過利息合計 (H2)
+      if (idxOverdueInterest !== -1 && nextLine[idxOverdueInterest] !== undefined) {
+        state.summary.totalOverdueInterest = parseNumber(nextLine[idxOverdueInterest]);
       }
 
       // 初期値としての総返済額（返済履歴明細の合計で確定）
       state.summary.totalRepaid = state.summary.principalRepaid;
       state.summary.interestRepaid = 0;
 
-      if (idxBalance !== -1 && nextLine[idxBalance] !== undefined) {
-        state.summary.balance = parseNumber(nextLine[idxBalance]);
-      }
-
-      if (idxInterest !== -1 && nextLine[idxInterest] !== undefined) {
-        state.summary.totalInterest = parseNumber(nextLine[idxInterest]);
-      }
-
+      // 返済率
       if (idxRepayRate !== -1 && nextLine[idxRepayRate] !== undefined) {
         const rateStr = nextLine[idxRepayRate] || '0';
         state.summary.repayRate = parseFloat(rateStr.replace('%', '')) || 0;
       }
 
+      // 明日の利息
       if (idxTomorrow !== -1 && nextLine[idxTomorrow] !== undefined) {
         state.summary.tomorrowInterest = parseNumber(nextLine[idxTomorrow]);
       }
 
+      // 免除ルール(日数)
       if (idxExemption !== -1 && nextLine[idxExemption] !== undefined) {
         state.summary.exemptionDays = nextLine[idxExemption] || '0';
-      }
-
-      if (idxInterestRate !== -1 && nextLine[idxInterestRate] !== undefined) {
-        state.summary.interestRate = nextLine[idxInterestRate] || '0%';
       }
 
       summaryFound = true;
@@ -288,8 +310,10 @@ function parseCSVData(csvText) {
       detailColMap.dueDate = cols.indexOf('返済期限');
       detailColMap.store = cols.indexOf('利用店舗');
       detailColMap.amount = cols.indexOf('利用額');
+      detailColMap.interestStartDate = cols.indexOf('利息発生日');
       detailColMap.resolvedAmount = cols.indexOf('解消済額');
       detailColMap.interest = cols.indexOf('利息');
+      detailColMap.overdueInterest = cols.indexOf('超過利息');
       detailColMap.balanceTotal = cols.indexOf('残額計');
       detailColMap.isPaid = cols.indexOf('返済済み');
       detailColMap.repayDate = cols.indexOf('返済日');
@@ -309,11 +333,19 @@ function parseCSVData(csvText) {
       const storeName = cols[storeIdx] || '不明';
       const usageAmount = parseNumber(cols[amountIdx]);
       
-      // 各行の返済状況（解消済額・残額計・返済済み）の取得
+      // 各行の返済状況（解消済額・通常利息・超過利息・残額計・返済済み）の取得
       const resolvedVal = detailColMap.resolvedAmount !== -1 ? cols[detailColMap.resolvedAmount] : '';
       const resolved = parseNumber(resolvedVal);
+      
+      const normalInterestVal = detailColMap.interest !== -1 ? cols[detailColMap.interest] : '';
+      const normalInterest = parseNumber(normalInterestVal);
+
+      const overdueInterestVal = detailColMap.overdueInterest !== -1 ? cols[detailColMap.overdueInterest] : '';
+      const overdueInterest = parseNumber(overdueInterestVal);
+
       const balanceVal = detailColMap.balanceTotal !== -1 ? cols[detailColMap.balanceTotal] : '';
       const balance = parseNumber(balanceVal);
+
       const isPaidStr = detailColMap.isPaid !== -1 && cols[detailColMap.isPaid] ? String(cols[detailColMap.isPaid]).trim().toUpperCase() : '';
       const isPaid = isPaidStr === 'TRUE';
 
@@ -340,6 +372,8 @@ function parseCSVData(csvText) {
           store: storeName,
           amount: usageAmount,
           resolvedAmount: resolved,
+          interest: normalInterest,
+          overdueInterest: overdueInterest,
           balance: balance,
           status: {
             text: statusText,
@@ -350,8 +384,8 @@ function parseCSVData(csvText) {
     }
 
     // 返済明細のパース
-    const repayDateIdx = detailColMap.repayDate !== -1 ? detailColMap.repayDate : 9;
-    const repayAmountIdx = detailColMap.repayAmount !== -1 ? detailColMap.repayAmount : 10;
+    const repayDateIdx = detailColMap.repayDate !== -1 ? detailColMap.repayDate : 10;
+    const repayAmountIdx = detailColMap.repayAmount !== -1 ? detailColMap.repayAmount : 11;
 
     if (cols[repayDateIdx] && cols[repayDateIdx] !== '返済日' && isDate(cols[repayDateIdx])) {
       const repayDate = cols[repayDateIdx];
@@ -387,7 +421,7 @@ function parseCSVData(csvText) {
     state.summary.repayRate = calcUsed > 0 ? (calcRepaid / calcUsed) * 100 : 0;
   }
 
-  // 直近の返済期限の集計
+  // 直近の返済期限および超過分の集計
   calculateNextDueDate();
 
   // 店舗リストの取得と全選択初期化
@@ -411,10 +445,10 @@ function parseCSVData(csvText) {
 }
 
 /**
- * 直近の返済期限と未納合計額、カウントダウンを計算
+ * 直近の返済期限と超過分、カウントダウンを計算
  */
 function calculateNextDueDate() {
-  // 未完済かつ期限が存在する明細を抽出
+  // 未完済かつ有効な期限が存在する明細を抽出
   const unpaidItems = state.usageList.filter(item => 
     item.status.key !== 'paid' && 
     item.dueDate && 
@@ -423,6 +457,9 @@ function calculateNextDueDate() {
   );
 
   if (unpaidItems.length === 0) {
+    state.summary.hasOverdue = false;
+    state.summary.overdueInfo = null;
+    state.summary.upcomingInfo = null;
     state.summary.nextDue = {
       date: '完済済',
       amount: 0,
@@ -432,74 +469,207 @@ function calculateNextDueDate() {
     return;
   }
 
-  // 期限が早い順にソート
-  unpaidItems.sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
-
-  // 最も直近の返済期限日
-  const earliestDueDate = unpaidItems[0].dueDate;
-
-  // その期限日と同一の未完済明細の残高を合計
-  const targetItems = unpaidItems.filter(item => item.dueDate === earliestDueDate);
-  const totalDueAmount = targetItems.reduce((sum, item) => sum + (item.balance > 0 ? item.balance : item.amount), 0);
-
-  // 本日日付との差分日数計算（時間リセット）
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const dueDateObj = new Date(earliestDueDate);
-  const targetDate = new Date(dueDateObj.getFullYear(), dueDateObj.getMonth(), dueDateObj.getDate());
 
-  const diffTime = targetDate.getTime() - today.getTime();
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  // 各明細の期日との差分日数を計算
+  const itemsWithDiff = unpaidItems.map(item => {
+    const parts = item.dueDate.split(/[\/\-]/);
+    const targetDate = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+    const diffTime = targetDate.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return {
+      ...item,
+      targetDate,
+      diffDays
+    };
+  });
 
-  let countdownText = '';
-  let countdownClass = '';
+  // 超過分 (diffDays < 0: 返済期限の翌日以降)
+  const overdueItems = itemsWithDiff.filter(item => item.diffDays < 0);
+  // 次回以降分 (diffDays >= 0: 本日以降が期日)
+  const upcomingItems = itemsWithDiff.filter(item => item.diffDays >= 0);
 
-  if (diffDays > 3) {
-    countdownText = `あと ${diffDays} 日`;
-    countdownClass = '';
-  } else if (diffDays > 0) {
-    countdownText = `あと ${diffDays} 日`;
-    countdownClass = 'imminent';
-  } else if (diffDays === 0) {
-    countdownText = '本日が期日';
-    countdownClass = 'overdue';
+  // 超過分の集計
+  if (overdueItems.length > 0) {
+    state.summary.hasOverdue = true;
+    // 期限日が古い順（最も超過日数が長い順）にソート
+    overdueItems.sort((a, b) => a.targetDate.getTime() - b.targetDate.getTime());
+    
+    // 超過分の期日
+    const earliestOverdueDate = overdueItems[0].dueDate;
+    // 超過分全体の残額計（元本＋通常利息＋超過利息）
+    const overdueTotalAmount = overdueItems.reduce((sum, item) => sum + (item.balance > 0 ? item.balance : item.amount), 0);
+    // 超過日数
+    const maxOverdueDays = Math.abs(overdueItems[0].diffDays);
+
+    state.summary.overdueInfo = {
+      date: earliestOverdueDate,
+      amount: overdueTotalAmount,
+      days: maxOverdueDays,
+      text: `${maxOverdueDays}日 超過`
+    };
   } else {
-    countdownText = `${Math.abs(diffDays)}日 超過`;
-    countdownClass = 'overdue';
+    state.summary.hasOverdue = false;
+    state.summary.overdueInfo = null;
   }
 
-  state.summary.nextDue = {
-    date: earliestDueDate,
-    amount: totalDueAmount,
-    countdown: countdownText,
-    countdownClass: countdownClass
-  };
+  // 次回以降分の集計
+  if (upcomingItems.length > 0) {
+    // 期限日が近い順にソート
+    upcomingItems.sort((a, b) => a.targetDate.getTime() - b.targetDate.getTime());
+    
+    const nextDueDate = upcomingItems[0].dueDate;
+    const nextDiffDays = upcomingItems[0].diffDays;
+    
+    // 最も直近の期日と同一の明細の残高を合算
+    const targetNextItems = upcomingItems.filter(item => item.dueDate === nextDueDate);
+    const nextTotalAmount = targetNextItems.reduce((sum, item) => sum + (item.balance > 0 ? item.balance : item.amount), 0);
+
+    let countdownText = '';
+    let countdownClass = '';
+
+    if (nextDiffDays > 3) {
+      countdownText = `あと ${nextDiffDays} 日`;
+      countdownClass = '';
+    } else if (nextDiffDays > 0) {
+      countdownText = `あと ${nextDiffDays} 日`;
+      countdownClass = 'imminent';
+    } else {
+      countdownText = '本日が期日';
+      countdownClass = 'overdue';
+    }
+
+    state.summary.upcomingInfo = {
+      date: nextDueDate,
+      amount: nextTotalAmount,
+      days: nextDiffDays,
+      text: countdownText,
+      countdownClass: countdownClass
+    };
+  } else {
+    state.summary.upcomingInfo = null;
+  }
+
+  // 1段表示用のフォールバック
+  if (state.summary.hasOverdue && state.summary.overdueInfo) {
+    state.summary.nextDue = {
+      date: state.summary.overdueInfo.date,
+      amount: state.summary.overdueInfo.amount,
+      countdown: state.summary.overdueInfo.text,
+      countdownClass: 'overdue'
+    };
+  } else if (state.summary.upcomingInfo) {
+    state.summary.nextDue = {
+      date: state.summary.upcomingInfo.date,
+      amount: state.summary.upcomingInfo.amount,
+      countdown: state.summary.upcomingInfo.text,
+      countdownClass: state.summary.upcomingInfo.countdownClass
+    };
+  }
+
+  // 明日の利息の内訳計算（通常分・超過分）
+  calculateTomorrowInterestBreakdown(overdueItems, upcomingItems);
 }
 
 /**
- * 直近の返済期限と金額のポップアップ（M3 Dialog）を表示
+ * 明日の利息の内訳（通常利息・超過利息）を計算
+ */
+function calculateTomorrowInterestBreakdown(overdueItems, upcomingItems) {
+  const normalRateNum = parseFloat(state.summary.normalInterestRate.replace('%', '')) / 100 || 0.20;
+  const overdueRateNum = parseFloat(state.summary.overdueInterestRate.replace('%', '')) / 100 || 0.294;
+
+  if (overdueItems.length > 0) {
+    // 超過対象の元金残高合計
+    const overduePrincipalTotal = overdueItems.reduce((sum, item) => {
+      const p = item.amount - item.resolvedAmount;
+      return sum + (p > 0 ? p : 0);
+    }, 0);
+
+    // 1日あたりの超過利息 (日歩)
+    const overduePerDay = Math.round((overduePrincipalTotal * overdueRateNum) / 365);
+    state.summary.tomorrowOverdueInterest = overduePerDay > 0 ? overduePerDay : 1;
+
+    // 通常対象の利息はスプレッドシートの明日の利息から超過分を引いた額、あるいは通常元金から算出
+    if (state.summary.tomorrowInterest > state.summary.tomorrowOverdueInterest) {
+      state.summary.tomorrowNormalInterest = state.summary.tomorrowInterest - state.summary.tomorrowOverdueInterest;
+    } else {
+      const upcomingPrincipalTotal = upcomingItems.reduce((sum, item) => {
+        const p = item.amount - item.resolvedAmount;
+        return sum + (p > 0 ? p : 0);
+      }, 0);
+      state.summary.tomorrowNormalInterest = Math.round((upcomingPrincipalTotal * normalRateNum) / 365);
+    }
+  } else {
+    state.summary.tomorrowNormalInterest = state.summary.tomorrowInterest;
+    state.summary.tomorrowOverdueInterest = 0;
+  }
+}
+
+/**
+ * 直近の返済期限ポップアップ（M3 Dialog）を表示
+ * 要件: 超過分がある場合は上下段表記に日数表記をそれぞれ出すため、全体の右上のX日超過は削除
  */
 function showDueModal() {
   const modalOverlay = document.getElementById('due-modal-overlay');
-  const modalDueDate = document.getElementById('modal-due-date');
-  const modalDueAmount = document.getElementById('modal-due-amount');
+  const modalSingle = document.getElementById('modal-body-single');
+  const modalMulti = document.getElementById('modal-body-multi');
   const modalCountdown = document.getElementById('modal-due-countdown');
 
   if (!modalOverlay) return;
 
-  const { date, amount, countdown, countdownClass } = state.summary.nextDue;
+  const { hasOverdue, overdueInfo, upcomingInfo, nextDue } = state.summary;
 
-  if (modalDueDate) {
-    modalDueDate.textContent = date || '-';
-  }
+  if (hasOverdue && overdueInfo && upcomingInfo) {
+    // 2段表示
+    if (modalSingle) modalSingle.classList.add('hidden');
+    if (modalMulti) modalMulti.classList.remove('hidden');
 
-  if (modalDueAmount) {
-    modalDueAmount.textContent = `¥${amount.toLocaleString()}`;
-  }
+    // 要件: 超過分がある場合は全体の右上のX日超過は削除
+    if (modalCountdown) {
+      modalCountdown.style.display = 'none';
+    }
 
-  if (modalCountdown) {
-    modalCountdown.textContent = countdown || '--';
-    modalCountdown.className = `countdown-tag ${countdownClass || ''}`.trim();
+    // 上の段: 期限超過分
+    const elOverdueDate = document.getElementById('modal-tier-overdue-date');
+    const elOverdueAmount = document.getElementById('modal-tier-overdue-amount');
+    const elOverdueCountdown = document.getElementById('modal-tier-overdue-countdown');
+
+    if (elOverdueDate) elOverdueDate.textContent = overdueInfo.date;
+    if (elOverdueAmount) elOverdueAmount.textContent = `¥${overdueInfo.amount.toLocaleString()}`;
+    if (elOverdueCountdown) elOverdueCountdown.textContent = overdueInfo.text;
+
+    // 下の段: 次回期限分
+    const elUpcomingDate = document.getElementById('modal-tier-upcoming-date');
+    const elUpcomingAmount = document.getElementById('modal-tier-upcoming-amount');
+    const elUpcomingCountdown = document.getElementById('modal-tier-upcoming-countdown');
+
+    if (elUpcomingDate) elUpcomingDate.textContent = upcomingInfo.date;
+    if (elUpcomingAmount) elUpcomingAmount.textContent = `¥${upcomingInfo.amount.toLocaleString()}`;
+    if (elUpcomingCountdown) {
+      elUpcomingCountdown.textContent = upcomingInfo.text;
+      elUpcomingCountdown.className = `countdown-tag ${upcomingInfo.countdownClass}`.trim();
+    }
+
+  } else {
+    // 1段表示 (超過なし)
+    if (modalSingle) modalSingle.classList.remove('hidden');
+    if (modalMulti) modalMulti.classList.add('hidden');
+
+    const modalDueDate = document.getElementById('modal-due-date');
+    const modalDueAmount = document.getElementById('modal-due-amount');
+
+    if (modalDueDate) {
+      modalDueDate.textContent = nextDue.date || '-';
+    }
+    if (modalDueAmount) {
+      modalDueAmount.textContent = `¥${nextDue.amount.toLocaleString()}`;
+    }
+    if (modalCountdown) {
+      modalCountdown.style.display = 'inline-flex';
+      modalCountdown.textContent = nextDue.countdown || '--';
+      modalCountdown.className = `countdown-tag ${nextDue.countdownClass || ''}`.trim();
+    }
   }
 
   modalOverlay.classList.remove('hidden');
@@ -557,14 +727,40 @@ function isDate(val) {
 }
 
 /**
- * KPIサマリーの描画 (M3フラットレイアウト・余白引き締め)
+ * KPIサマリーの描画
  */
 function renderKPI() {
-  const { totalUsed, totalRepaid, principalRepaid, interestRepaid, balance, repayRate, tomorrowInterest, exemptionDays, exemptionAmount, nextDue } = state.summary;
+  const { 
+    totalUsed, 
+    totalRepaid, 
+    principalRepaid, 
+    interestRepaid, 
+    balance, 
+    totalInterest,
+    totalOverdueInterest,
+    repayRate, 
+    tomorrowInterest, 
+    tomorrowNormalInterest,
+    tomorrowOverdueInterest,
+    exemptionDays, 
+    exemptionAmount, 
+    normalInterestRate,
+    overdueInterestRate,
+    hasOverdue, 
+    overdueInfo, 
+    upcomingInfo, 
+    nextDue 
+  } = state.summary;
 
-  // 1: 総利用額
+  // 1: 総利用額 & 利息込み総返済額 (計算: D2 + G2 + H2)
   const elTotalUsed = document.getElementById('kpi-total-used');
   if (elTotalUsed) elTotalUsed.textContent = `¥${totalUsed.toLocaleString()}`;
+
+  const elTotalWithInterest = document.getElementById('kpi-total-with-interest');
+  if (elTotalWithInterest) {
+    const fullRepayAmount = totalUsed + totalInterest + totalOverdueInterest;
+    elTotalWithInterest.textContent = `(利息込: ¥${fullRepayAmount.toLocaleString()})`;
+  }
 
   // 利用件数バッジ (上下中央位置)
   const elCountUsed = document.getElementById('kpi-count-used');
@@ -592,28 +788,84 @@ function renderKPI() {
     progressBarFill.style.width = `${clampedRate}%`;
   }
 
-  // 5: 右上 明日の利息予定額
-  const elTomorrow = document.getElementById('kpi-tomorrow-interest');
-  if (elTomorrow) elTomorrow.textContent = `¥${tomorrowInterest.toLocaleString()}`;
+  // 5: 直近の返済期限 (超過分がある場合は2段表示)
+  const dueSingleContainer = document.getElementById('due-single-container');
+  const dueMultiContainer = document.getElementById('due-multi-container');
 
-  // 6: 右上 免除条件 (文言: 直近n日にm円以上返済で免除)
-  const elExemption = document.getElementById('kpi-exemption-rule');
-  if (elExemption) {
-    const formattedAmount = exemptionAmount > 0 ? `¥${exemptionAmount.toLocaleString()}` : '¥2,000';
-    elExemption.textContent = `直近${exemptionDays}日に${formattedAmount}円以上返済で免除`;
+  if (hasOverdue && overdueInfo && upcomingInfo) {
+    if (dueSingleContainer) dueSingleContainer.classList.add('hidden');
+    if (dueMultiContainer) dueMultiContainer.classList.remove('hidden');
+
+    // 上の段: 超過分 (返済額、超過日数、返済期限日)
+    const elTierOverdueAmount = document.getElementById('kpi-tier-overdue-amount');
+    const elTierOverdueDays = document.getElementById('kpi-tier-overdue-days');
+    const elTierOverdueDate = document.getElementById('kpi-tier-overdue-date');
+
+    if (elTierOverdueAmount) elTierOverdueAmount.textContent = `¥${overdueInfo.amount.toLocaleString()}`;
+    if (elTierOverdueDays) elTierOverdueDays.textContent = `${overdueInfo.days}日 超過`;
+    if (elTierOverdueDate) elTierOverdueDate.textContent = overdueInfo.date;
+
+    // 下の段: 次の期限分 (返済額、あと何日、返済期限日)
+    const elTierUpcomingAmount = document.getElementById('kpi-tier-upcoming-amount');
+    const elTierUpcomingDays = document.getElementById('kpi-tier-upcoming-days');
+    const elTierUpcomingDate = document.getElementById('kpi-tier-upcoming-date');
+
+    if (elTierUpcomingAmount) elTierUpcomingAmount.textContent = `¥${upcomingInfo.amount.toLocaleString()}`;
+    if (elTierUpcomingDays) {
+      elTierUpcomingDays.textContent = upcomingInfo.text;
+      elTierUpcomingDays.className = `countdown-tag ${upcomingInfo.countdownClass}`.trim();
+    }
+    if (elTierUpcomingDate) elTierUpcomingDate.textContent = upcomingInfo.date;
+
+  } else {
+    if (dueSingleContainer) dueSingleContainer.classList.remove('hidden');
+    if (dueMultiContainer) dueMultiContainer.classList.add('hidden');
+
+    const elDueDate = document.getElementById('kpi-due-date');
+    if (elDueDate) elDueDate.textContent = nextDue.date;
+
+    const elDueAmount = document.getElementById('kpi-due-amount');
+    if (elDueAmount) elDueAmount.textContent = `¥${nextDue.amount.toLocaleString()}`;
+
+    const elCountdown = document.getElementById('kpi-due-countdown');
+    if (elCountdown) {
+      elCountdown.textContent = nextDue.countdown;
+      elCountdown.className = `countdown-tag ${nextDue.countdownClass}`.trim();
+    }
   }
 
-  // 7: 右下 直近の返済期限
-  const elDueDate = document.getElementById('kpi-due-date');
-  if (elDueDate) elDueDate.textContent = nextDue.date;
+  // 6: 明日の利息予定額 (超過がある場合は2段表示で金利も表記し、超過分は利息免除対象外と明記)
+  const tomorrowSingleContainer = document.getElementById('tomorrow-single-container');
+  const tomorrowMultiContainer = document.getElementById('tomorrow-multi-container');
 
-  const elDueAmount = document.getElementById('kpi-due-amount');
-  if (elDueAmount) elDueAmount.textContent = `¥${nextDue.amount.toLocaleString()}`;
+  const formattedAmount = exemptionAmount > 0 ? `¥${exemptionAmount.toLocaleString()}` : '¥2,000';
+  const exemptionText = `直近${exemptionDays}日に${formattedAmount}円以上返済で免除`;
 
-  const elCountdown = document.getElementById('kpi-due-countdown');
-  if (elCountdown) {
-    elCountdown.textContent = nextDue.countdown;
-    elCountdown.className = `countdown-tag ${nextDue.countdownClass}`.trim();
+  if (hasOverdue && overdueInfo) {
+    if (tomorrowSingleContainer) tomorrowSingleContainer.classList.add('hidden');
+    if (tomorrowMultiContainer) tomorrowMultiContainer.classList.remove('hidden');
+
+    const elNormalRate = document.getElementById('kpi-normal-rate');
+    const elOverdueRate = document.getElementById('kpi-overdue-rate');
+    const elTomorrowNormal = document.getElementById('kpi-tomorrow-normal-interest');
+    const elTomorrowOverdue = document.getElementById('kpi-tomorrow-overdue-interest');
+    const elExemptionMulti = document.getElementById('kpi-exemption-rule-multi');
+
+    if (elNormalRate) elNormalRate.textContent = normalInterestRate;
+    if (elOverdueRate) elOverdueRate.textContent = overdueInterestRate;
+    if (elTomorrowNormal) elTomorrowNormal.textContent = `¥${tomorrowNormalInterest.toLocaleString()}`;
+    if (elTomorrowOverdue) elTomorrowOverdue.textContent = `¥${tomorrowOverdueInterest.toLocaleString()}`;
+    if (elExemptionMulti) elExemptionMulti.textContent = exemptionText;
+
+  } else {
+    if (tomorrowSingleContainer) tomorrowSingleContainer.classList.remove('hidden');
+    if (tomorrowMultiContainer) tomorrowMultiContainer.classList.add('hidden');
+
+    const elTomorrow = document.getElementById('kpi-tomorrow-interest');
+    if (elTomorrow) elTomorrow.textContent = `¥${tomorrowInterest.toLocaleString()}`;
+
+    const elExemption = document.getElementById('kpi-exemption-rule');
+    if (elExemption) elExemption.textContent = exemptionText;
   }
 
   // 件数バッジ更新
@@ -847,6 +1099,7 @@ function renderCharts() {
 
 /**
  * 店舗別支出割合（ドーナツチャート - M3パレット）
+ * 利用額の多い順に12時の向きから時計回りに配置
  */
 function renderStoreChart() {
   const canvas = document.getElementById('storeChart');
@@ -857,8 +1110,11 @@ function renderStoreChart() {
     storeTotals[item.store] = (storeTotals[item.store] || 0) + item.amount;
   });
 
-  const labels = Object.keys(storeTotals);
-  const data = Object.values(storeTotals);
+  // 利用額の多い順にソート（降順）
+  const sortedStores = Object.entries(storeTotals).sort((a, b) => b[1] - a[1]);
+
+  const labels = sortedStores.map(entry => entry[0]);
+  const data = sortedStores.map(entry => entry[1]);
 
   // M3の計算されたトーンカラー
   const backgroundColors = [
@@ -884,6 +1140,8 @@ function renderStoreChart() {
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      rotation: 0,
+      circumference: 360,
       plugins: {
         legend: {
           position: 'right',
@@ -1185,7 +1443,7 @@ function escapeHTML(str) {
 }
 
 /**
- * テーブルの横スクロールが必要かどうかを判定し、必要な場合のみスクロールヒントを表示→フェードアウト
+ * テーブルの横スクロールが必要かどうかを判定し、必要な場合のみスクロールヒントを表示
  * @param {string} containerId - テーブルコンテナのID
  * @param {string} hintId - スクロールヒント要素のID
  */

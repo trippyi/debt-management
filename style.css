@@ -73,6 +73,11 @@ body {
   padding: 28px 24px 60px 24px;
 }
 
+/* 汎用非表示クラス */
+.hidden {
+  display: none !important;
+}
+
 /* ==========================================================================
    M3 Top App Bar (トップアプリケーションバー)
    ========================================================================== */
@@ -281,10 +286,23 @@ body {
   font-variant-numeric: tabular-nums;
   line-height: 1.2;
   margin-bottom: 4px;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
 }
 
 .card-main-val.highlight-due {
   color: var(--md-sys-color-error);
+}
+
+/* 利息込みの総返済額 (括弧書き表示) */
+.total-with-interest {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--md-sys-color-on-surface-variant);
+  margin-left: 6px;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
 }
 
 /* カード下部・補足情報行 */
@@ -365,9 +383,11 @@ body {
   font-weight: 600;
   padding: 2px 8px;
   border-radius: 10px;
-  background-color: var(--md-sys-color-error-container);
-  color: var(--md-sys-color-on-error);
+  background-color: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-on-surface-variant);
   line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .countdown-tag.overdue {
@@ -398,12 +418,150 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* 免除条件テキスト: 改行せず1行で表示 */
 .exemption-text-value {
   font-size: 0.75rem;
   font-weight: 600;
   color: var(--md-sys-color-success);
-  line-height: 1.2;
+  line-height: 1.25;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ==========================================================================
+   2段表示スタイル (超過金利制度対応: KPIカード3 & 4)
+   ========================================================================== */
+
+/* カード3: 直近返済期限の2段表示 */
+.due-multi-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 4px;
+  flex: 1;
+}
+
+.due-tier-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tier-top-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.tier-amount {
+  font-size: 1.0625rem;
+  font-weight: 700;
+  color: var(--md-sys-color-on-surface);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.tier-amount.highlight-due {
+  color: var(--md-sys-color-error);
+}
+
+.tier-date-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.6875rem;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.tier-badge {
+  font-size: 0.625rem;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  line-height: 1.2;
+}
+
+.tier-badge.overdue-badge {
+  background-color: var(--md-sys-color-error-container);
+  color: var(--md-sys-color-on-error);
+}
+
+.tier-badge.upcoming-badge {
+  background-color: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.tier-date-text {
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+
+.tier-divider {
+  border-top: 1px dashed var(--md-sys-color-outline-variant);
+  margin: 4px 0;
+}
+
+/* カード4: 明日の利息の2段表示 */
+.tomorrow-multi-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 4px;
+  flex: 1;
+}
+
+.tomorrow-tiers-box {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-bottom: 2px;
+}
+
+.tomorrow-tier-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.75rem;
+}
+
+.tomorrow-rate-label {
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 0.6875rem;
+  white-space: nowrap;
+}
+
+.tomorrow-tier-val {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--md-sys-color-on-surface);
+  white-space: nowrap;
+}
+
+.tomorrow-tier-val.highlight-due {
+  color: var(--md-sys-color-error);
+}
+
+.card-sub-info.multiline-exemption {
+  align-items: flex-start;
+  margin-top: 2px;
+  gap: 4px;
+}
+
+.exemption-text-box {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.exemption-disclaimer {
+  display: block;
+  font-size: 0.625rem;
+  font-weight: 500;
+  color: var(--md-sys-color-error);
+  margin-top: 1px;
+  white-space: nowrap;
 }
 
 /* ==========================================================================
@@ -450,20 +608,19 @@ body {
   gap: 28px;
   border-bottom: 1px solid var(--md-sys-color-outline-variant);
   margin-bottom: 16px;
-  position: relative;
 }
 
 .tab-btn {
   background: transparent;
   border: none;
-  padding: 8px 4px;
   font-family: inherit;
   font-size: 0.875rem;
   font-weight: 500;
   color: var(--md-sys-color-on-surface-variant);
+  padding: 10px 4px 12px 4px;
   cursor: pointer;
   position: relative;
-  transition: color var(--md-sys-motion-duration-short) var(--md-sys-motion-easing-standard);
+  transition: color var(--md-sys-motion-duration-short);
 }
 
 .tab-btn:hover {
@@ -475,119 +632,107 @@ body {
   font-weight: 600;
 }
 
-/* M3 Tab Indicator */
+/* アクティブタブのインジケーターライン */
 .tab-btn.active::after {
   content: '';
   position: absolute;
   bottom: -1px;
   left: 0;
-  right: 0;
+  width: 100%;
   height: 3px;
   background-color: var(--md-sys-color-primary);
-  border-top-left-radius: 3px;
-  border-top-right-radius: 3px;
+  border-radius: 3px 3px 0 0;
 }
 
-/* M3 Controls Row */
+/* コントロール行 */
 .controls-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 14px;
-  margin-bottom: 14px;
+  gap: 16px;
+  margin-bottom: 12px;
 }
 
-/* M3 Search Input (Docked / Flat Style) */
+/* 検索バー (M3 Docked Search Style) */
 .search-input-box {
   display: flex;
   align-items: center;
   gap: 8px;
   background-color: var(--md-sys-color-surface-container-high);
-  border-radius: 24px;
-  padding: 5px 14px;
-  width: 240px;
-  transition: background-color var(--md-sys-motion-duration-short) var(--md-sys-motion-easing-standard);
-}
-
-.search-input-box:focus-within {
-  background-color: var(--md-sys-color-surface-container-low);
-  outline: 1px solid var(--md-sys-color-primary);
-}
-
-.search-input-box input {
-  background: transparent;
-  border: none;
-  font-family: inherit;
-  font-size: 0.8125rem;
-  color: var(--md-sys-color-on-surface);
-  outline: none;
-  width: 100%;
-}
-
-.search-input-box input::placeholder {
-  color: var(--md-sys-color-on-surface-variant);
+  border-radius: 20px;
+  padding: 6px 14px;
+  width: 280px;
 }
 
 .search-input-box .material-symbols-outlined {
   font-size: 18px;
-  color: var(--md-sys-color-on-surface-variant);
+  color: var(--md-sys-color-outline);
 }
 
-/* M3 Sort Select */
+.search-input-box input {
+  border: none;
+  background: transparent;
+  outline: none;
+  font-family: inherit;
+  font-size: 0.8125rem;
+  color: var(--md-sys-color-on-surface);
+  width: 100%;
+}
+
+.search-input-box input::placeholder {
+  color: var(--md-sys-color-outline);
+}
+
+/* ソートセレクトボックス */
 .sort-select-box {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   font-size: 0.8125rem;
   color: var(--md-sys-color-on-surface-variant);
 }
 
 .sort-select-box select {
-  background-color: var(--md-sys-color-surface);
   border: 1px solid var(--md-sys-color-outline-variant);
-  border-radius: 6px;
+  background-color: var(--md-sys-color-surface);
+  color: var(--md-sys-color-on-surface);
+  border-radius: 8px;
   padding: 5px 10px;
   font-family: inherit;
   font-size: 0.8125rem;
-  color: var(--md-sys-color-on-surface);
   outline: none;
   cursor: pointer;
 }
 
-.sort-select-box select:focus {
-  border-color: var(--md-sys-color-primary);
-}
-
-/* M3 Filter Chips (店舗絞り込み) */
+/* 店舗フィルターエリア */
 .store-filter-area {
-  margin-bottom: 16px;
-  padding: 10px 0;
-  border-top: 1px solid var(--md-sys-color-outline-variant);
+  padding: 10px 0 16px 0;
   border-bottom: 1px solid var(--md-sys-color-outline-variant);
+  margin-bottom: 16px;
 }
 
 .store-filter-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  font-size: 0.8125rem;
-  color: var(--md-sys-color-on-surface-variant);
-  margin-bottom: 6px;
+  gap: 12px;
+  margin-bottom: 8px;
 }
 
 .store-filter-header .label {
+  font-size: 0.75rem;
   font-weight: 500;
-  color: var(--md-sys-color-on-surface);
+  color: var(--md-sys-color-on-surface-variant);
 }
 
 .filter-action-btn {
   background: transparent;
   border: none;
   color: var(--md-sys-color-primary);
-  font-size: 0.8125rem;
+  font-family: inherit;
+  font-size: 0.75rem;
   font-weight: 500;
   cursor: pointer;
+  padding: 2px 4px;
 }
 
 .filter-action-btn:hover {
@@ -618,55 +763,140 @@ body {
   cursor: pointer;
 }
 
-/* ==========================================================================
-   M3 Data Table (各列のバランス良い横位置アライメント)
-   ========================================================================== */
-
+/* テーブルスタイル (横スクロール対応 & 1行目・1列目固定設定) */
 .table-container {
-  overflow: auto;
-  max-height: 60vh;
-  margin-bottom: 20px;
+  overflow-x: auto;
   position: relative;
+  max-width: 100%;
 }
 
 .simple-table {
   width: 100%;
-  border-collapse: collapse;
-  font-size: 0.875rem;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.8125rem;
+  text-align: left;
 }
 
-.simple-table thead {
+/* すべてのセルを改行禁止に徹底 */
+.simple-table th,
+.simple-table td {
+  white-space: nowrap;
+}
+
+/* 1行目固定ヘッダー (Sticky Header) */
+.simple-table thead th {
   position: sticky;
   top: 0;
-  z-index: 2;
-}
-
-.simple-table th {
-  font-weight: 500;
+  z-index: 10;
+  padding: 10px 14px;
+  font-weight: 600;
   color: var(--md-sys-color-on-surface-variant);
-  padding: 10px 12px;
   border-bottom: 1px solid var(--md-sys-color-outline-variant);
-  white-space: nowrap;
-  font-size: 0.75rem;
-  letter-spacing: 0.02em;
-  background-color: var(--md-sys-color-surface);
+  background-color: var(--md-sys-color-surface-container-low);
 }
 
 .simple-table td {
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+  padding: 11px 14px;
   color: var(--md-sys-color-on-surface);
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-  transition: background-color var(--md-sys-motion-duration-short);
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+  vertical-align: middle;
+  background-color: var(--md-sys-color-surface);
+}
+
+/* 1列目固定 (Sticky First Column: 利用日列) */
+.simple-table th:first-child,
+.simple-table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 5;
+  background-color: var(--md-sys-color-surface);
+  box-shadow: 2px 0 3px -1px rgba(0, 0, 0, 0.08);
+}
+
+/* 1行目1列目の交差セル (Top-Left) */
+.simple-table thead th:first-child {
+  z-index: 15;
+  background-color: var(--md-sys-color-surface-container-low);
+  box-shadow: 2px 0 3px -1px rgba(0, 0, 0, 0.08);
 }
 
 .simple-table tbody tr:hover td {
-  background-color: var(--md-sys-color-surface-container-low);
+  background-color: var(--md-sys-color-surface-container-lowest);
 }
 
-.simple-table tbody tr:hover td:nth-child(1) {
-  background-color: var(--md-sys-color-surface-container-low);
+.simple-table tbody tr:hover td:first-child {
+  background-color: var(--md-sys-color-surface-container-lowest);
+}
+
+/* テーブル列アライメント & 幅配分（店舗名の余白過大を防ぎステータス等に配分） */
+.usage-table {
+  min-width: 760px; /* スマホ・PCともに押し潰されて改行されるのを防止 */
+}
+
+.usage-table th.col-date,
+.usage-table td:nth-child(1) {
+  text-align: center;
+  width: 110px;
+  min-width: 110px;
+}
+
+.usage-table th.col-store,
+.usage-table td:nth-child(2) {
+  text-align: left;
+  width: 150px;
+  min-width: 130px;
+}
+
+.usage-table th.col-amount,
+.usage-table td:nth-child(3) {
+  text-align: right;
+  width: 110px;
+  min-width: 100px;
+  font-variant-numeric: tabular-nums;
+}
+
+.usage-table th.col-status,
+.usage-table td:nth-child(4) {
+  text-align: center;
+  width: 140px;
+  min-width: 130px;
+}
+
+.usage-table th.col-resolved,
+.usage-table td:nth-child(5) {
+  text-align: center;
+  width: 170px;
+  min-width: 160px;
+}
+
+.usage-table th.col-due,
+.usage-table td:nth-child(6) {
+  text-align: center;
+  width: 120px;
+  min-width: 110px;
+}
+
+.repayment-table-container {
+  width: 100%;
+  max-width: 100%;
+}
+
+.repayment-table {
+  width: 100%;
+}
+
+.repayment-table th.col-repay-date,
+.repayment-table td:nth-child(1) {
+  text-align: center;
+  width: 50%;
+}
+
+.repayment-table th.col-repay-amount,
+.repayment-table td:nth-child(2) {
+  text-align: right;
+  width: 50%;
+  font-variant-numeric: tabular-nums;
 }
 
 .text-right {
@@ -675,94 +905,46 @@ body {
 
 .table-empty {
   text-align: center;
-  padding: 36px !important;
-  color: var(--md-sys-color-on-surface-variant);
+  padding: 36px 14px;
+  color: var(--md-sys-color-outline);
 }
 
-/* --- 利用明細テーブルの各列アライメント --- */
-.usage-table th.col-date,
-.usage-table td:nth-child(1) {
+/* スクロールヒント: 中央に固定配置 */
+.scroll-hint {
+  display: none;
+  align-items: center;
+  justify-content: center; /* 中央に固定 */
+  gap: 6px;
+  font-size: 0.6875rem;
+  color: var(--md-sys-color-outline);
+  margin-bottom: 6px;
   text-align: center;
-  width: 105px;
-  position: sticky;
-  left: 0;
-  z-index: 1;
-  background-color: var(--md-sys-color-surface);
+  width: 100%;
 }
 
-/* theadの1列目は縦横両方のstickyが重なるため最前面に */
-.usage-table th.col-date {
-  z-index: 3;
+.scroll-hint.visible {
+  display: flex;
 }
 
-.usage-table th.col-store,
-.usage-table td:nth-child(2) {
-  text-align: left;
+.scroll-hint-icon {
+  font-size: 14px;
 }
 
-.usage-table th.col-amount,
-.usage-table td:nth-child(3) {
-  text-align: right;
-  width: 105px;
-}
-
-.usage-table th.col-status,
-.usage-table td:nth-child(4) {
-  text-align: center;
-  width: 120px;
-}
-
-.usage-table th.col-resolved,
-.usage-table td:nth-child(5) {
-  text-align: center;
-  width: 170px;
-}
-
-.usage-table th.col-due,
-.usage-table td:nth-child(6) {
-  text-align: center;
-  width: 110px;
-}
-
-/* --- 返済履歴テーブルの各列アライメント --- */
-.repayment-table-container {
-  max-width: 480px;
-}
-
-.repayment-table th.col-repay-date,
-.repayment-table td:nth-child(1) {
-  text-align: center;
-  width: 50%;
-  position: sticky;
-  left: 0;
-  z-index: 1;
-  background-color: var(--md-sys-color-surface);
-}
-
-.repayment-table th.col-repay-date {
-  z-index: 3;
-}
-
-.repayment-table th.col-repay-amount,
-.repayment-table td:nth-child(2) {
-  text-align: right;
-  width: 50%;
-}
-
-/* M3 Status Indicators */
+/* テーブル内ステータス: 改行禁止 */
 .status-indicator-text {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   font-weight: 500;
+  white-space: nowrap;
 }
 
 .status-indicator-text .dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  display: inline-block;
+  flex-shrink: 0;
 }
 
 .status-indicator-text.paid {
@@ -789,7 +971,7 @@ body {
   background-color: var(--md-sys-color-error);
 }
 
-/* 一部返済詳細 */
+/* 一部返済詳細: 改行禁止 */
 .partial-amount-info {
   display: inline-flex;
   align-items: center;
@@ -797,16 +979,19 @@ body {
   gap: 6px;
   font-size: 0.8125rem;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .partial-amount-info .paid-part {
   color: var(--md-sys-color-success);
   font-weight: 500;
+  white-space: nowrap;
 }
 
 .partial-amount-info .remain-part {
   color: var(--md-sys-color-error);
   font-weight: 500;
+  white-space: nowrap;
 }
 
 .partial-amount-info .slash {
@@ -818,6 +1003,7 @@ body {
   font-size: 0.8125rem;
   color: var(--md-sys-color-on-surface-variant);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .due-date-cell.highlight-due {
@@ -890,7 +1076,7 @@ body {
   letter-spacing: -0.01em;
 }
 
-/* メイン情報エリア: サマリーエリアと同様、枠線で囲まず線分で美しく区切る */
+/* メイン情報エリア (1段表示) */
 .modal-body-divided {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -908,14 +1094,14 @@ body {
   padding: 0 24px;
 }
 
-/* 1列目は左端余白を詰め、右側に垂直仕切り線 (M3 Vertical Divider) */
-.modal-info-col:first-child {
+/* 1列目は左端余白を詰め、右側に垂直仕切り線 (点線) */
+.modal-body-divided .modal-info-col:first-child {
   padding-left: 0;
-  border-right: 1px solid var(--md-sys-color-outline-variant);
+  border-right: 1px dashed var(--md-sys-color-outline-variant);
 }
 
 /* 2列目は右端余白を詰める */
-.modal-info-col:last-child {
+.modal-body-divided .modal-info-col:last-child {
   padding-right: 0;
 }
 
@@ -934,12 +1120,71 @@ body {
   line-height: 1.2;
 }
 
+.modal-date-val.highlight-due {
+  color: var(--md-sys-color-error);
+}
+
 .modal-amount-val {
   font-size: 2rem;
   font-weight: 700;
   color: var(--md-sys-color-error);
   font-variant-numeric: tabular-nums;
   line-height: 1.2;
+}
+
+.modal-amount-val.modal-amount-upcoming,
+.modal-tier-upcoming .modal-amount-val {
+  color: var(--md-sys-color-on-surface);
+}
+
+/* 2段表示用モーダルボディ */
+.modal-body-multi {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.modal-tier-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.modal-tier-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modal-tier-title {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.modal-tier-overdue .modal-tier-title {
+  color: var(--md-sys-color-error);
+}
+
+.modal-tier-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+}
+
+.modal-tier-grid .modal-info-col:first-child {
+  padding-left: 0;
+  border-right: 1px dashed var(--md-sys-color-outline-variant);
+}
+
+.modal-tier-grid .modal-info-col:last-child {
+  padding-right: 0;
+}
+
+/* 超過分と次回分の仕切り線 (実線) */
+.modal-tier-divider {
+  border-top: 1px solid var(--md-sys-color-outline-variant);
+  margin: 8px 0;
 }
 
 /* アクション行: 上側に水平線分 */
@@ -967,34 +1212,6 @@ body {
 
 .btn-modal-close:hover {
   background-color: #93000a;
-}
-
-/* ==========================================================================
-   スクロールヒント（横スクロールが必要な場合のみ常時表示）
-   ========================================================================== */
-
-.scroll-hint {
-  display: none;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 6px 0;
-  font-size: 0.75rem;
-  font-weight: 500;
-  color: var(--md-sys-color-on-surface-variant);
-}
-
-.scroll-hint.visible {
-  display: flex;
-}
-
-.scroll-hint-icon {
-  font-size: 18px;
-  color: var(--md-sys-color-outline);
-}
-
-.scroll-hint-text {
-  letter-spacing: 0.02em;
 }
 
 /* ==========================================================================
@@ -1028,7 +1245,7 @@ body {
 @media (orientation: portrait),
 (max-aspect-ratio: 1/1) {
   .app-container {
-    padding: 16px 14px 40px 14px;
+    padding: 16px 14px 100px 14px;
   }
 
   .main-header {
@@ -1081,15 +1298,35 @@ body {
   }
 
   .card-main-val {
-    font-size: 1.1875rem;
+    font-size: 1.125rem;
+  }
+
+  .total-with-interest {
+    font-size: 0.75rem;
+    margin-left: 4px;
   }
 
   .sub-detail-text {
     font-size: 0.625rem;
   }
 
+  /* スマホ表示時: 免除テキストを改行させずフォントサイズ縮小で1行に収める */
   .exemption-text-value {
-    font-size: 0.6875rem;
+    font-size: 0.625rem;
+    white-space: nowrap;
+  }
+
+  .exemption-disclaimer {
+    font-size: 0.5625rem;
+    white-space: nowrap;
+  }
+
+  .tier-amount {
+    font-size: 0.9375rem;
+  }
+
+  .tomorrow-tier-val {
+    font-size: 0.8125rem;
   }
 
   /* チャートを1カラムに */
@@ -1151,11 +1388,23 @@ body {
     padding: 0;
   }
 
-  .modal-info-col:first-child {
+  .modal-body-divided .modal-info-col:first-child {
     border-right: none;
-    border-bottom: 1px solid var(--md-sys-color-outline-variant);
+    border-bottom: 1px dashed var(--md-sys-color-outline-variant);
     padding-bottom: 16px;
     margin-bottom: 16px;
+  }
+
+  .modal-tier-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .modal-tier-grid .modal-info-col:first-child {
+    border-right: none;
+    border-bottom: 1px dashed var(--md-sys-color-outline-variant);
+    padding-bottom: 8px;
+    margin-bottom: 4px;
   }
 
   .modal-date-val {
@@ -1163,6 +1412,16 @@ body {
   }
 
   .modal-amount-val {
-    font-size: 1.75rem;
+    font-size: 1.625rem;
+  }
+
+  /* スマホ表示時のフッター余白と中央配置 */
+  .main-footer {
+    margin-top: 36px;
+    padding-top: 18px;
+    margin-bottom: 24px;
+    justify-content: center;
+    text-align: center;
+    font-size: 0.8125rem;
   }
 }
