@@ -17,10 +17,20 @@
   <!-- Chart.js CDN -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <!-- Custom CSS -->
-  <link rel="stylesheet" href="style.css?v=9">
+  <link rel="stylesheet" href="style.css?v=11">
 </head>
 
 <body>
+
+  <!-- 初回データ読み込み待機用 M3 ローディングサークル -->
+  <div id="initial-loader" class="initial-loader-overlay">
+    <div class="m3-circular-progress" role="progressbar" aria-label="データを読み込んでいます">
+      <svg class="circular-spinner" viewBox="22 22 44 44">
+        <circle class="spinner-circle" cx="44" cy="44" r="20.2" fill="none" stroke-width="3.6"></circle>
+      </svg>
+    </div>
+    <div class="loader-message">データを読み込んでいます...</div>
+  </div>
 
   <div class="app-container">
     <!-- M3 Top App Bar -->
@@ -332,10 +342,10 @@
 
       <!-- メイン情報エリア (2段表示: 超過あり) -->
       <div class="modal-body-multi hidden" id="modal-body-multi">
-        <!-- 上の段: 期限超過分 (返済額、超過日数、返済期限日) -->
+        <!-- 上の段: 期限超過分 / 直近期限分 (返済額、日数、返済期限日) -->
         <div class="modal-tier-block modal-tier-overdue">
           <div class="modal-tier-header">
-            <span class="modal-tier-title">期限超過分</span>
+            <span class="modal-tier-title" id="modal-tier-overdue-title">期限超過分</span>
             <span class="countdown-tag overdue" id="modal-tier-overdue-countdown">-日 超過</span>
           </div>
           <div class="modal-tier-grid">
@@ -355,7 +365,7 @@
         <!-- 下の段: 次回期限分 (返済額、あと何日、返済期限日) -->
         <div class="modal-tier-block modal-tier-upcoming">
           <div class="modal-tier-header">
-            <span class="modal-tier-title">次回期限分</span>
+            <span class="modal-tier-title" id="modal-tier-upcoming-title">次回期限分</span>
             <span class="countdown-tag" id="modal-tier-upcoming-countdown">あと - 日</span>
           </div>
           <div class="modal-tier-grid">
@@ -382,7 +392,7 @@
   </div>
 
   <!-- Custom JavaScript -->
-  <script src="app.js?v=9"></script>
+  <script src="app.js?v=11"></script>
 </body>
 
 </html>

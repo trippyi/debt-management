@@ -1,10 +1,20 @@
 /**
  * 利用・返済状況 Webアプリケーション
  * Googleスプレッドシート CSVデータ連携 & パース・可視化ロジック
+ * 
+ * - LocalStorageキャッシュ & バックグラウンド差分更新（高速化）
+ * - 初回アクセス時ローディングサークル待機
+ * - 超過利息発生中および発生1週間前予告時の2段仕様デザイン（カウントダウンは日数のみ）
  */
 
 // Googleスプレッドシートの公開CSV URL
 const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQVCYqe59Zkq1-9vhu1MX_O8jnL84l_zAvUsyEAc5qrb6gUXG5LdoMYl3RLYSq19qAfeY7bawrSg1wb/pub?gid=1628160295&single=true&output=csv';
+
+// LocalStorageのキー定義
+const STORAGE_KEYS = {
+  CSV_DATA: 'debt_management_csv_data',
+  LAST_SYNC: 'debt_management_last_sync'
+};
 
 // アプリケーションの状態管理オブジェクト
 const state = {
@@ -24,9 +34,11 @@ const state = {
     exemptionAmount: 0,
     normalInterestRate: '20.00%',
     overdueInterestRate: '29.40%',
-    hasOverdue: false,
-    overdueInfo: null,
-    upcomingInfo: null,
+    isTwoTier: false, // 2段仕様表示フラグ（超過利息発生中、または1週間前予告時）
+    hasOverdue: false, // 実際の期限超過分が存在するかどうか
+    isWarningPreview: false, // 超過利息発生1週間前予告中かどうか
+    overdueInfo: null, // 上段ブロック情報
+    upcomingInfo: null, // 下段ブロック情報
     nextDue: {
       date: '-',
       amount: 0,
@@ -56,13 +68,69 @@ document.addEventListener('DOMContentLoaded', () => {
 
 /**
  * アプリケーションの初期化
+ * LocalStorageキャッシュの即時描画 & バックグラウンド差分更新
  */
 function initApp() {
   setupEventListeners();
-  fetchData();
+
+  // LocalStorageから前回キャッシュデータの読み込みを試行
+  const cachedCsv = localStorage.getItem(STORAGE_KEYS.CSV_DATA);
+  const cachedSyncTime = localStorage.getItem(STORAGE_KEYS.LAST_SYNC);
+
+  if (cachedCsv) {
+    // キャッシュが存在する場合: 即座にパース・描画して表示を高速化 (0ms)
+    try {
+      parseCSVData(cachedCsv, true);
+      hideInitialLoader();
+      
+      if (cachedSyncTime) {
+        const lastSyncEl = document.getElementById('last-sync-time');
+        if (lastSyncEl) {
+          lastSyncEl.textContent = `最終更新: ${cachedSyncTime} (キャッシュ)`;
+        }
+      }
+      
+      updateStatus(true, '同期確認中');
+    } catch (cacheErr) {
+      console.warn('キャッシュデータの復元に失敗しました:', cacheErr);
+      showInitialLoader();
+    }
+
+    // バックグラウンドで最新データを取得し、差異があれば更新
+    fetchData(true);
+  } else {
+    // 初回アクセス時などキャッシュが存在しない場合: ローディングサークルを表示して取得待機
+    showInitialLoader();
+    fetchData(false);
+  }
   
   // 5分ごとの自動データ更新タイマー設定
-  setInterval(fetchData, 5 * 60 * 1000);
+  setInterval(() => {
+    fetchData(true);
+  }, 5 * 60 * 1000);
+}
+
+/**
+ * 初回ローディングサークルの表示
+ */
+function showInitialLoader() {
+  const loader = document.getElementById('initial-loader');
+  if (loader) {
+    loader.classList.remove('hidden', 'fade-out');
+  }
+}
+
+/**
+ * 初回ローディングサークルの非表示（フェードアウト）
+ */
+function hideInitialLoader() {
+  const loader = document.getElementById('initial-loader');
+  if (loader && !loader.classList.contains('hidden')) {
+    loader.classList.add('fade-out');
+    setTimeout(() => {
+      loader.classList.add('hidden');
+    }, 300);
+  }
 }
 
 /**
@@ -73,7 +141,7 @@ function setupEventListeners() {
   const refreshBtn = document.getElementById('refresh-btn');
   if (refreshBtn) {
     refreshBtn.addEventListener('click', () => {
-      fetchData();
+      fetchData(false);
     });
   }
 
@@ -162,10 +230,13 @@ function setupEventListeners() {
 
 /**
  * GoogleスプレッドシートのCSVデータを非同期取得
+ * @param {boolean} isBackground - バックグラウンド更新かどうか
  */
-async function fetchData() {
+async function fetchData(isBackground = false) {
   updateStatus(true, '更新中');
-  showAlert('info', '更新中', '最新のデータを取得しています');
+  if (!isBackground) {
+    showAlert('info', '更新中', '最新のデータを取得しています');
+  }
 
   try {
     const response = await fetch(CSV_URL, { cache: 'no-cache' });
@@ -173,14 +244,37 @@ async function fetchData() {
       throw new Error(`HTTPステータス: ${response.status}`);
     }
     const csvText = await response.text();
-    parseCSVData(csvText);
     
-    updateStatus(false, '同期完了');
-    showAlert('success', '完了', 'データを正常に読み込みました');
-    
-    // 更新日時表示
+    // LocalStorageに保存されている前回のCSVデータと比較
+    const cachedCsv = localStorage.getItem(STORAGE_KEYS.CSV_DATA);
+    const isDifferent = cachedCsv !== csvText;
+
     const now = new Date();
     const timeString = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+    if (isDifferent || !cachedCsv) {
+      // 差異がある場合、または初回取得時はLocalStorageを更新して画面再描画
+      localStorage.setItem(STORAGE_KEYS.CSV_DATA, csvText);
+      localStorage.setItem(STORAGE_KEYS.LAST_SYNC, timeString);
+      
+      parseCSVData(csvText, false);
+      
+      if (isBackground && cachedCsv) {
+        showAlert('success', '更新完了', 'バックグラウンドで最新データを反映しました');
+      } else if (!isBackground) {
+        showAlert('success', '完了', 'データを正常に読み込みました');
+      }
+    } else {
+      // 差異がない場合は再描画によるチラつきを防ぎ、同期ステータスのみ最新化
+      localStorage.setItem(STORAGE_KEYS.LAST_SYNC, timeString);
+      if (!isBackground) {
+        showAlert('success', '完了', 'データは既に最新の状態です');
+      }
+    }
+
+    updateStatus(false, '同期完了');
+    
+    // 更新日時表示
     const lastSyncEl = document.getElementById('last-sync-time');
     if (lastSyncEl) {
       lastSyncEl.textContent = `最終更新: ${timeString}`;
@@ -189,16 +283,25 @@ async function fetchData() {
   } catch (error) {
     console.error('データ取得エラー:', error);
     updateStatus(false, '取得失敗');
-    showAlert('error', 'エラー', `データの取得に失敗しました: ${error.message}`);
+    
+    const cachedCsv = localStorage.getItem(STORAGE_KEYS.CSV_DATA);
+    if (cachedCsv) {
+      showAlert('warning', 'オフライン表示', `最新のデータ取得に失敗したため前回の保存データを表示しています: ${error.message}`);
+    } else {
+      showAlert('error', 'エラー', `データの取得に失敗しました: ${error.message}`);
+    }
+  } finally {
+    // 初回ローディングサークルを終了
+    hideInitialLoader();
   }
 }
 
 /**
  * CSVテキストをパースしてデータオブジェクトを生成
- * 超過金利制度導入に伴う新列マッピングに対応
  * @param {string} csvText - 取得したCSV文字列
+ * @param {boolean} isInitialRender - キャッシュ等による初期描画かどうか
  */
-function parseCSVData(csvText) {
+function parseCSVData(csvText, isInitialRender = false) {
   const lines = csvText.split(/\r?\n/).map(line => line.trim()).filter(line => line.length > 0);
   
   state.usageList = [];
@@ -206,7 +309,7 @@ function parseCSVData(csvText) {
 
   let summaryFound = false;
 
-  // 明細カラムの動的マッピング用変数（超過利息列追加後のデフォルトインデックス）
+  // 明細カラムの動的マッピング用変数
   let detailColMap = {
     usageDate: 0,
     dueDate: 1,
@@ -421,7 +524,7 @@ function parseCSVData(csvText) {
     state.summary.repayRate = calcUsed > 0 ? (calcRepaid / calcUsed) * 100 : 0;
   }
 
-  // 直近の返済期限および超過分の集計
+  // 直近の返済期限および超過分・予告の集計（2段仕様判定）
   calculateNextDueDate();
 
   // 店舗リストの取得と全選択初期化
@@ -445,7 +548,7 @@ function parseCSVData(csvText) {
 }
 
 /**
- * 直近の返済期限と超過分、カウントダウンを計算
+ * 直近の返済期限と超過分、および超過利息予告（2段仕様、日数のみ）を計算
  */
 function calculateNextDueDate() {
   // 未完済かつ有効な期限が存在する明細を抽出
@@ -457,7 +560,9 @@ function calculateNextDueDate() {
   );
 
   if (unpaidItems.length === 0) {
+    state.summary.isTwoTier = false;
     state.summary.hasOverdue = false;
+    state.summary.isWarningPreview = false;
     state.summary.overdueInfo = null;
     state.summary.upcomingInfo = null;
     state.summary.nextDue = {
@@ -478,6 +583,7 @@ function calculateNextDueDate() {
     const targetDate = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
     const diffTime = targetDate.getTime() - today.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
     return {
       ...item,
       targetDate,
@@ -490,81 +596,148 @@ function calculateNextDueDate() {
   // 次回以降分 (diffDays >= 0: 本日以降が期日)
   const upcomingItems = itemsWithDiff.filter(item => item.diffDays >= 0);
 
-  // 超過分の集計
+  // 【ケース1: 超過利息発生中（超過分が存在する場合）】
   if (overdueItems.length > 0) {
     state.summary.hasOverdue = true;
+    state.summary.isWarningPreview = false;
+
     // 期限日が古い順（最も超過日数が長い順）にソート
     overdueItems.sort((a, b) => a.targetDate.getTime() - b.targetDate.getTime());
     
-    // 超過分の期日
     const earliestOverdueDate = overdueItems[0].dueDate;
-    // 超過分全体の残額計（元本＋通常利息＋超過利息）
     const overdueTotalAmount = overdueItems.reduce((sum, item) => sum + (item.balance > 0 ? item.balance : item.amount), 0);
-    // 超過日数
     const maxOverdueDays = Math.abs(overdueItems[0].diffDays);
 
     state.summary.overdueInfo = {
+      title: '期限超過分',
       date: earliestOverdueDate,
       amount: overdueTotalAmount,
       days: maxOverdueDays,
-      text: `${maxOverdueDays}日 超過`
+      text: `${maxOverdueDays}日 超過`,
+      badgeClass: 'overdue'
     };
-  } else {
-    state.summary.hasOverdue = false;
-    state.summary.overdueInfo = null;
-  }
 
-  // 次回以降分の集計
-  if (upcomingItems.length > 0) {
-    // 期限日が近い順にソート
-    upcomingItems.sort((a, b) => a.targetDate.getTime() - b.targetDate.getTime());
-    
-    const nextDueDate = upcomingItems[0].dueDate;
-    const nextDiffDays = upcomingItems[0].diffDays;
-    
-    // 最も直近の期日と同一の明細の残高を合算
-    const targetNextItems = upcomingItems.filter(item => item.dueDate === nextDueDate);
-    const nextTotalAmount = targetNextItems.reduce((sum, item) => sum + (item.balance > 0 ? item.balance : item.amount), 0);
+    if (upcomingItems.length > 0) {
+      upcomingItems.sort((a, b) => a.targetDate.getTime() - b.targetDate.getTime());
+      const nextDueDate = upcomingItems[0].dueDate;
+      const nextDiffDays = upcomingItems[0].diffDays;
+      const targetNextItems = upcomingItems.filter(item => item.dueDate === nextDueDate);
+      const nextTotalAmount = targetNextItems.reduce((sum, item) => sum + (item.balance > 0 ? item.balance : item.amount), 0);
 
-    let countdownText = '';
-    let countdownClass = '';
+      let countdownText = '';
+      let countdownClass = '';
+      if (nextDiffDays > 3) {
+        countdownText = `あと ${nextDiffDays} 日`;
+        countdownClass = '';
+      } else if (nextDiffDays > 0) {
+        countdownText = `あと ${nextDiffDays} 日`;
+        countdownClass = 'imminent';
+      } else {
+        countdownText = '本日が期日';
+        countdownClass = 'overdue';
+      }
 
-    if (nextDiffDays > 3) {
-      countdownText = `あと ${nextDiffDays} 日`;
-      countdownClass = '';
-    } else if (nextDiffDays > 0) {
-      countdownText = `あと ${nextDiffDays} 日`;
-      countdownClass = 'imminent';
+      state.summary.upcomingInfo = {
+        title: '次回期限分',
+        date: nextDueDate,
+        amount: nextTotalAmount,
+        days: nextDiffDays,
+        text: countdownText,
+        badgeClass: countdownClass
+      };
+
+      state.summary.isTwoTier = true;
     } else {
-      countdownText = '本日が期日';
-      countdownClass = 'overdue';
+      state.summary.upcomingInfo = null;
+      state.summary.isTwoTier = false;
     }
 
-    state.summary.upcomingInfo = {
-      date: nextDueDate,
-      amount: nextTotalAmount,
-      days: nextDiffDays,
-      text: countdownText,
-      countdownClass: countdownClass
+  // 【ケース2: 超過分はなく、直近期日が1週間前予告期間（diffDays <= 7）の場合】
+  // 超過利息発生中と同じデザイン（２段仕様）とし、カウントダウンも日数のみで表示
+  } else if (upcomingItems.length > 0) {
+    state.summary.hasOverdue = false;
+    upcomingItems.sort((a, b) => a.targetDate.getTime() - b.targetDate.getTime());
+
+    // ユニークな期日一覧を取得
+    const uniqueDates = [...new Set(upcomingItems.map(item => item.dueDate))];
+    const firstDate = uniqueDates[0];
+    const firstItems = upcomingItems.filter(item => item.dueDate === firstDate);
+    const firstAmount = firstItems.reduce((sum, item) => sum + (item.balance > 0 ? item.balance : item.amount), 0);
+    const firstDiffDays = firstItems[0].diffDays;
+
+    // 直近期日が7日以内の場合は超過利息発生予告として2段仕様にする
+    if (firstDiffDays <= 7) {
+      state.summary.isTwoTier = true;
+      state.summary.isWarningPreview = true;
+
+      const firstCountdownText = firstDiffDays === 0 ? '本日が期日' : `あと ${firstDiffDays} 日`;
+
+      // 上の段: 直近期限分 (超過利息発生中と同じデザイン、警告赤バッジ)
+      state.summary.overdueInfo = {
+        title: '直近期限分',
+        date: firstDate,
+        amount: firstAmount,
+        days: firstDiffDays,
+        text: firstCountdownText,
+        badgeClass: 'overdue' // 超過利息発生中と同様の赤バッジで目立たせる
+      };
+
+      // 下の段: 次回期限分（第2の期日がある場合）
+      if (uniqueDates.length > 1) {
+        const secondDate = uniqueDates[1];
+        const secondItems = upcomingItems.filter(item => item.dueDate === secondDate);
+        const secondAmount = secondItems.reduce((sum, item) => sum + (item.balance > 0 ? item.balance : item.amount), 0);
+        const secondDiffDays = secondItems[0].diffDays;
+
+        state.summary.upcomingInfo = {
+          title: '次回期限分',
+          date: secondDate,
+          amount: secondAmount,
+          days: secondDiffDays,
+          text: `あと ${secondDiffDays} 日`,
+          badgeClass: ''
+        };
+      } else {
+        // 次回の期日がない場合
+        state.summary.upcomingInfo = {
+          title: '次回期限分',
+          date: '未定',
+          amount: 0,
+          days: 0,
+          text: '次回なし',
+          badgeClass: ''
+        };
+      }
+    } else {
+      // 8日以上の平常時は1段表示
+      state.summary.isTwoTier = false;
+      state.summary.isWarningPreview = false;
+      state.summary.overdueInfo = null;
+      state.summary.upcomingInfo = null;
+    }
+
+    state.summary.nextDue = {
+      date: firstDate,
+      amount: firstAmount,
+      countdown: `あと ${firstDiffDays} 日`,
+      countdownClass: firstDiffDays <= 3 ? 'imminent' : ''
     };
+
   } else {
+    state.summary.isTwoTier = false;
+    state.summary.hasOverdue = false;
+    state.summary.isWarningPreview = false;
+    state.summary.overdueInfo = null;
     state.summary.upcomingInfo = null;
   }
 
-  // 1段表示用のフォールバック
+  // 1段表示用フォールバック
   if (state.summary.hasOverdue && state.summary.overdueInfo) {
     state.summary.nextDue = {
       date: state.summary.overdueInfo.date,
       amount: state.summary.overdueInfo.amount,
       countdown: state.summary.overdueInfo.text,
       countdownClass: 'overdue'
-    };
-  } else if (state.summary.upcomingInfo) {
-    state.summary.nextDue = {
-      date: state.summary.upcomingInfo.date,
-      amount: state.summary.upcomingInfo.amount,
-      countdown: state.summary.upcomingInfo.text,
-      countdownClass: state.summary.upcomingInfo.countdownClass
     };
   }
 
@@ -608,7 +781,7 @@ function calculateTomorrowInterestBreakdown(overdueItems, upcomingItems) {
 
 /**
  * 直近の返済期限ポップアップ（M3 Dialog）を表示
- * 要件: 超過分がある場合は上下段表記に日数表記をそれぞれ出すため、全体の右上のX日超過は削除
+ * 超過利息発生中および発生1週間前予告時は2段仕様で統一
  */
 function showDueModal() {
   const modalOverlay = document.getElementById('due-modal-overlay');
@@ -618,41 +791,48 @@ function showDueModal() {
 
   if (!modalOverlay) return;
 
-  const { hasOverdue, overdueInfo, upcomingInfo, nextDue } = state.summary;
+  const { isTwoTier, overdueInfo, upcomingInfo, nextDue } = state.summary;
 
-  if (hasOverdue && overdueInfo && upcomingInfo) {
+  if (isTwoTier && overdueInfo && upcomingInfo) {
     // 2段表示
     if (modalSingle) modalSingle.classList.add('hidden');
     if (modalMulti) modalMulti.classList.remove('hidden');
 
-    // 要件: 超過分がある場合は全体の右上のX日超過は削除
+    // 2段表示時は全体の右上のカウントダウンバッジは非表示
     if (modalCountdown) {
       modalCountdown.style.display = 'none';
     }
 
-    // 上の段: 期限超過分
+    // 上の段: 期限超過分 / 直近期限分
+    const elOverdueTitle = document.getElementById('modal-tier-overdue-title');
     const elOverdueDate = document.getElementById('modal-tier-overdue-date');
     const elOverdueAmount = document.getElementById('modal-tier-overdue-amount');
     const elOverdueCountdown = document.getElementById('modal-tier-overdue-countdown');
 
+    if (elOverdueTitle) elOverdueTitle.textContent = overdueInfo.title || '期限超過分';
     if (elOverdueDate) elOverdueDate.textContent = overdueInfo.date;
     if (elOverdueAmount) elOverdueAmount.textContent = `¥${overdueInfo.amount.toLocaleString()}`;
-    if (elOverdueCountdown) elOverdueCountdown.textContent = overdueInfo.text;
+    if (elOverdueCountdown) {
+      elOverdueCountdown.textContent = overdueInfo.text;
+      elOverdueCountdown.className = `countdown-tag ${overdueInfo.badgeClass || 'overdue'}`.trim();
+    }
 
     // 下の段: 次回期限分
+    const elUpcomingTitle = document.getElementById('modal-tier-upcoming-title');
     const elUpcomingDate = document.getElementById('modal-tier-upcoming-date');
     const elUpcomingAmount = document.getElementById('modal-tier-upcoming-amount');
     const elUpcomingCountdown = document.getElementById('modal-tier-upcoming-countdown');
 
+    if (elUpcomingTitle) elUpcomingTitle.textContent = upcomingInfo.title || '次回期限分';
     if (elUpcomingDate) elUpcomingDate.textContent = upcomingInfo.date;
-    if (elUpcomingAmount) elUpcomingAmount.textContent = `¥${upcomingInfo.amount.toLocaleString()}`;
+    if (elUpcomingAmount) elUpcomingAmount.textContent = upcomingInfo.amount > 0 ? `¥${upcomingInfo.amount.toLocaleString()}` : '-';
     if (elUpcomingCountdown) {
       elUpcomingCountdown.textContent = upcomingInfo.text;
-      elUpcomingCountdown.className = `countdown-tag ${upcomingInfo.countdownClass}`.trim();
+      elUpcomingCountdown.className = `countdown-tag ${upcomingInfo.badgeClass || ''}`.trim();
     }
 
   } else {
-    // 1段表示 (超過なし)
+    // 1段表示 (平常時)
     if (modalSingle) modalSingle.classList.remove('hidden');
     if (modalMulti) modalMulti.classList.add('hidden');
 
@@ -746,6 +926,7 @@ function renderKPI() {
     exemptionAmount, 
     normalInterestRate,
     overdueInterestRate,
+    isTwoTier,
     hasOverdue, 
     overdueInfo, 
     upcomingInfo, 
@@ -788,21 +969,24 @@ function renderKPI() {
     progressBarFill.style.width = `${clampedRate}%`;
   }
 
-  // 5: 直近の返済期限 (超過分がある場合は2段表示)
+  // 5: 直近の返済期限 (超過利息発生中または予告時は2段表示)
   const dueSingleContainer = document.getElementById('due-single-container');
   const dueMultiContainer = document.getElementById('due-multi-container');
 
-  if (hasOverdue && overdueInfo && upcomingInfo) {
+  if (isTwoTier && overdueInfo && upcomingInfo) {
     if (dueSingleContainer) dueSingleContainer.classList.add('hidden');
     if (dueMultiContainer) dueMultiContainer.classList.remove('hidden');
 
-    // 上の段: 超過分 (返済額、超過日数、返済期限日)
+    // 上の段: 超過分 / 直近期限分 (返済額、日数、返済期限日)
     const elTierOverdueAmount = document.getElementById('kpi-tier-overdue-amount');
     const elTierOverdueDays = document.getElementById('kpi-tier-overdue-days');
     const elTierOverdueDate = document.getElementById('kpi-tier-overdue-date');
 
     if (elTierOverdueAmount) elTierOverdueAmount.textContent = `¥${overdueInfo.amount.toLocaleString()}`;
-    if (elTierOverdueDays) elTierOverdueDays.textContent = `${overdueInfo.days}日 超過`;
+    if (elTierOverdueDays) {
+      elTierOverdueDays.textContent = overdueInfo.text;
+      elTierOverdueDays.className = `countdown-tag ${overdueInfo.badgeClass || 'overdue'}`.trim();
+    }
     if (elTierOverdueDate) elTierOverdueDate.textContent = overdueInfo.date;
 
     // 下の段: 次の期限分 (返済額、あと何日、返済期限日)
@@ -810,10 +994,10 @@ function renderKPI() {
     const elTierUpcomingDays = document.getElementById('kpi-tier-upcoming-days');
     const elTierUpcomingDate = document.getElementById('kpi-tier-upcoming-date');
 
-    if (elTierUpcomingAmount) elTierUpcomingAmount.textContent = `¥${upcomingInfo.amount.toLocaleString()}`;
+    if (elTierUpcomingAmount) elTierUpcomingAmount.textContent = upcomingInfo.amount > 0 ? `¥${upcomingInfo.amount.toLocaleString()}` : '-';
     if (elTierUpcomingDays) {
       elTierUpcomingDays.textContent = upcomingInfo.text;
-      elTierUpcomingDays.className = `countdown-tag ${upcomingInfo.countdownClass}`.trim();
+      elTierUpcomingDays.className = `countdown-tag ${upcomingInfo.badgeClass || ''}`.trim();
     }
     if (elTierUpcomingDate) elTierUpcomingDate.textContent = upcomingInfo.date;
 
