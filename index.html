@@ -17,7 +17,7 @@
   <!-- Chart.js CDN -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <!-- Custom CSS -->
-  <link rel="stylesheet" href="style.css?v=11">
+  <link rel="stylesheet" href="style.css?v=12">
 </head>
 
 <body>
@@ -170,11 +170,11 @@
             </div>
             <!-- 2段利息表示 -->
             <div class="tomorrow-tiers-box">
-              <div class="tomorrow-tier-row">
+              <div class="tomorrow-tier-row" id="tomorrow-normal-row">
                 <span class="tomorrow-rate-label">通常金利 (<span id="kpi-normal-rate">20.00%</span>):</span>
                 <span class="tomorrow-tier-val" id="kpi-tomorrow-normal-interest">¥0</span>
               </div>
-              <div class="tomorrow-tier-row overdue-interest-row">
+              <div class="tomorrow-tier-row overdue-interest-row" id="tomorrow-overdue-row">
                 <span class="tomorrow-rate-label">超過金利 (<span id="kpi-overdue-rate">29.40%</span>):</span>
                 <span class="tomorrow-tier-val highlight-due" id="kpi-tomorrow-overdue-interest">¥0</span>
               </div>
@@ -392,7 +392,7 @@
   </div>
 
   <!-- Custom JavaScript -->
-  <script src="app.js?v=11"></script>
+  <script src="app.js?v=13"></script>
 </body>
 
 </html>

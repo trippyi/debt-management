@@ -30,6 +30,8 @@ const state = {
     tomorrowInterest: 0,
     tomorrowNormalInterest: 0,
     tomorrowOverdueInterest: 0,
+    isNormalInterestExempt: false,
+    exemptionRemainingDays: 0,
     exemptionDays: '0',
     exemptionAmount: 0,
     normalInterestRate: '20.00%',
@@ -74,8 +76,15 @@ function initApp() {
   setupEventListeners();
 
   // LocalStorageから前回キャッシュデータの読み込みを試行
-  const cachedCsv = localStorage.getItem(STORAGE_KEYS.CSV_DATA);
+  let cachedCsv = localStorage.getItem(STORAGE_KEYS.CSV_DATA);
   const cachedSyncTime = localStorage.getItem(STORAGE_KEYS.LAST_SYNC);
+
+  // 古いキャッシュ（10/24返済未反映データ）を検知した場合は破棄して完全リフレッシュ
+  if (cachedCsv && (!cachedCsv.includes('2026/10/24') || !cachedCsv.includes('8454'))) {
+    localStorage.removeItem(STORAGE_KEYS.CSV_DATA);
+    localStorage.removeItem(STORAGE_KEYS.LAST_SYNC);
+    cachedCsv = null;
+  }
 
   if (cachedCsv) {
     // キャッシュが存在する場合: 即座にパース・描画して表示を高速化 (0ms)
@@ -141,6 +150,7 @@ function setupEventListeners() {
   const refreshBtn = document.getElementById('refresh-btn');
   if (refreshBtn) {
     refreshBtn.addEventListener('click', () => {
+      localStorage.removeItem(STORAGE_KEYS.CSV_DATA);
       fetchData(false);
     });
   }
@@ -239,11 +249,27 @@ async function fetchData(isBackground = false) {
   }
 
   try {
-    const response = await fetch(CSV_URL, { cache: 'no-cache' });
-    if (!response.ok) {
-      throw new Error(`HTTPステータス: ${response.status}`);
+    const cacheBusterUrl = `${CSV_URL}&_cb=${Date.now()}`;
+    let csvText = '';
+    try {
+      const response = await fetch(cacheBusterUrl, { cache: 'no-store' });
+      if (!response.ok) {
+        throw new Error(`HTTPステータス: ${response.status}`);
+      }
+      csvText = await response.text();
+    } catch (networkError) {
+      // ローカルfile:///環境やCORS制限等の場合、最新ローカルファイルへのフォールバック取得を試行
+      try {
+        const localResp = await fetch(`./latest_csv.txt?_cb=${Date.now()}`);
+        if (localResp.ok) {
+          csvText = await localResp.text();
+        } else {
+          throw networkError;
+        }
+      } catch (localErr) {
+        throw networkError;
+      }
     }
-    const csvText = await response.text();
     
     // LocalStorageに保存されている前回のCSVデータと比較
     const cachedCsv = localStorage.getItem(STORAGE_KEYS.CSV_DATA);
@@ -571,6 +597,11 @@ function calculateNextDueDate() {
       countdown: '未納なし',
       countdownClass: ''
     };
+    state.summary.tomorrowInterest = 0;
+    state.summary.tomorrowNormalInterest = 0;
+    state.summary.tomorrowOverdueInterest = 0;
+    state.summary.isNormalInterestExempt = false;
+    state.summary.exemptionRemainingDays = 0;
     return;
   }
 
@@ -742,41 +773,119 @@ function calculateNextDueDate() {
   }
 
   // 明日の利息の内訳計算（通常分・超過分）
-  calculateTomorrowInterestBreakdown(overdueItems, upcomingItems);
+  calculateTomorrowInterestBreakdown(itemsWithDiff);
+}
+
+/**
+ * 直近n日以内の入金による利息免除ステータスを判定
+ * 返済履歴から直近exemptionDays日以内の返済額合計がexemptionAmount以上かを検証
+ * @returns {{ isExempt: boolean, remainingDays: number, recentTotal: number }}
+ */
+function getExemptionStatus() {
+  const days = parseInt(state.summary.exemptionDays, 10) || 7;
+  const targetAmount = state.summary.exemptionAmount || 2000;
+  
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  let minDaysPassed = Infinity;
+  let recentTotal = 0;
+
+  state.repaymentList.forEach(item => {
+    if (!item.date || !isDate(item.date)) return;
+    const parts = item.date.split(/[\/\-]/);
+    const rDate = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+    const diffTime = today.getTime() - rDate.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+    // 今日以前かつ直近days日以内の返済を合算
+    if (diffDays >= 0 && diffDays <= days) {
+      recentTotal += item.amount;
+      if (diffDays < minDaysPassed) {
+        minDaysPassed = diffDays;
+      }
+    }
+  });
+
+  const isExempt = recentTotal >= targetAmount;
+  // 免除ルールの残り日数 (免除期間日数 - 最も直近の返済からの経過日数)
+  const remainingDays = isExempt && minDaysPassed !== Infinity ? Math.max(0, days - minDaysPassed) : 0;
+
+  return {
+    isExempt,
+    remainingDays,
+    recentTotal
+  };
 }
 
 /**
  * 明日の利息の内訳（通常利息・超過利息）を計算
+ * 
+ * - 超過利息は入金免除ルール等を無視した最上位ルールとして、
+ *   本日が返済期限（翌日超過）またはすでに期限超過している未納分に対し、どんな状態でも必ず発生する。
+ * - 逆に直近n日以内に入金があった場合、通常利息は免除（0円）。
+ *   この場合は通常金利は加算せず、超過利息のみを発生させる。
+ * - 免除ルールから外れる日数が経過した後は、通常利息も合算・表示される。
+ * 
+ * @param {Array} itemsWithDiff - 期限差分情報付きの未納明細リスト
  */
-function calculateTomorrowInterestBreakdown(overdueItems, upcomingItems) {
+function calculateTomorrowInterestBreakdown(itemsWithDiff) {
   const normalRateNum = parseFloat(state.summary.normalInterestRate.replace('%', '')) / 100 || 0.20;
   const overdueRateNum = parseFloat(state.summary.overdueInterestRate.replace('%', '')) / 100 || 0.294;
 
-  if (overdueItems.length > 0) {
-    // 超過対象の元金残高合計
-    const overduePrincipalTotal = overdueItems.reduce((sum, item) => {
-      const p = item.amount - item.resolvedAmount;
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  // ① 明日超過利息が発生する未納明細: 返済期限が今日以前 (diffDays <= 0)
+  // 本日が期日のものも本日未納なら明日から超過利息が発生する
+  const tomorrowOverdueItems = itemsWithDiff.filter(item => item.diffDays <= 0);
+
+  // ② 明日通常利息が発生する未納明細: 返済期限が明日以降 (diffDays > 0)
+  const tomorrowUpcomingItems = itemsWithDiff.filter(item => item.diffDays > 0);
+
+  // 超過対象の元金残高合計
+  const overduePrincipalTotal = tomorrowOverdueItems.reduce((sum, item) => {
+    const p = item.amount - (item.resolvedAmount || 0);
+    return sum + (p > 0 ? p : 0);
+  }, 0);
+
+  // 超過利息の計算 (免除ルールを一切受け付けず確実に計算)
+  if (overduePrincipalTotal > 0) {
+    const overduePerDay = Math.round((overduePrincipalTotal * overdueRateNum) / 365);
+    state.summary.tomorrowOverdueInterest = overduePerDay > 0 ? overduePerDay : 1;
+  } else {
+    state.summary.tomorrowOverdueInterest = 0;
+  }
+
+  // 直近n日以内の入金による利息免除判定
+  const exemptionStatus = getExemptionStatus();
+  state.summary.isNormalInterestExempt = exemptionStatus.isExempt;
+  state.summary.exemptionRemainingDays = exemptionStatus.remainingDays;
+
+  // 通常利息の計算
+  if (exemptionStatus.isExempt) {
+    // 直近n日以内に入金がある場合、通常利息は免除 (0円)
+    state.summary.tomorrowNormalInterest = 0;
+  } else {
+    // 免除期間外の場合: 返済期限前の明細のうち利息発生日を過ぎているものから通常利息を算出
+    const normalPrincipalTotal = tomorrowUpcomingItems.reduce((sum, item) => {
+      if (item.interestStartDate && isDate(item.interestStartDate)) {
+        const parts = item.interestStartDate.split(/[\/\-]/);
+        const startDate = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+        if (today.getTime() < startDate.getTime()) {
+          return sum;
+        }
+      }
+      const p = item.amount - (item.resolvedAmount || 0);
       return sum + (p > 0 ? p : 0);
     }, 0);
 
-    // 1日あたりの超過利息 (日歩)
-    const overduePerDay = Math.round((overduePrincipalTotal * overdueRateNum) / 365);
-    state.summary.tomorrowOverdueInterest = overduePerDay > 0 ? overduePerDay : 1;
-
-    // 通常対象の利息はスプレッドシートの明日の利息から超過分を引いた額、あるいは通常元金から算出
-    if (state.summary.tomorrowInterest > state.summary.tomorrowOverdueInterest) {
-      state.summary.tomorrowNormalInterest = state.summary.tomorrowInterest - state.summary.tomorrowOverdueInterest;
-    } else {
-      const upcomingPrincipalTotal = upcomingItems.reduce((sum, item) => {
-        const p = item.amount - item.resolvedAmount;
-        return sum + (p > 0 ? p : 0);
-      }, 0);
-      state.summary.tomorrowNormalInterest = Math.round((upcomingPrincipalTotal * normalRateNum) / 365);
-    }
-  } else {
-    state.summary.tomorrowNormalInterest = state.summary.tomorrowInterest;
-    state.summary.tomorrowOverdueInterest = 0;
+    const normalPerDay = Math.round((normalPrincipalTotal * normalRateNum) / 365);
+    state.summary.tomorrowNormalInterest = normalPerDay;
   }
+
+  // 明日の合計利息予定額
+  state.summary.tomorrowInterest = state.summary.tomorrowNormalInterest + state.summary.tomorrowOverdueInterest;
 }
 
 /**
@@ -1018,14 +1127,17 @@ function renderKPI() {
     }
   }
 
-  // 6: 明日の利息予定額 (超過がある場合は2段表示で金利も表記し、超過分は利息免除対象外と明記)
+  // 6: 明日の利息予定額 (超過利息が発生する場合は専用表示、通常利息免除中は超過金利のみ表示)
   const tomorrowSingleContainer = document.getElementById('tomorrow-single-container');
   const tomorrowMultiContainer = document.getElementById('tomorrow-multi-container');
+  const normalRow = document.getElementById('tomorrow-normal-row');
+  const overdueRow = document.getElementById('tomorrow-overdue-row');
 
   const formattedAmount = exemptionAmount > 0 ? `¥${exemptionAmount.toLocaleString()}` : '¥2,000';
   const exemptionText = `直近${exemptionDays}日に${formattedAmount}円以上返済で免除`;
 
-  if (hasOverdue && overdueInfo) {
+  // 超過利息が発生する場合（返済期限超過中、または本日が返済期限の未納明細が存在する場合）
+  if (tomorrowOverdueInterest > 0) {
     if (tomorrowSingleContainer) tomorrowSingleContainer.classList.add('hidden');
     if (tomorrowMultiContainer) tomorrowMultiContainer.classList.remove('hidden');
 
@@ -1037,11 +1149,24 @@ function renderKPI() {
 
     if (elNormalRate) elNormalRate.textContent = normalInterestRate;
     if (elOverdueRate) elOverdueRate.textContent = overdueInterestRate;
-    if (elTomorrowNormal) elTomorrowNormal.textContent = `¥${tomorrowNormalInterest.toLocaleString()}`;
     if (elTomorrowOverdue) elTomorrowOverdue.textContent = `¥${tomorrowOverdueInterest.toLocaleString()}`;
     if (elExemptionMulti) elExemptionMulti.textContent = exemptionText;
 
+    // 超過利息発生中かつ直近n日以内に入金があった場合、通常利息は免除のため「超過金利のみ表示」
+    // ルールから外れる日数経過（免除終了）後は通常金利も表示して2段表示
+    if (state.summary.isNormalInterestExempt || tomorrowNormalInterest === 0) {
+      if (normalRow) normalRow.style.display = 'none';
+      if (overdueRow) overdueRow.style.display = 'flex';
+    } else {
+      if (normalRow) {
+        normalRow.style.display = 'flex';
+        if (elTomorrowNormal) elTomorrowNormal.textContent = `¥${tomorrowNormalInterest.toLocaleString()}`;
+      }
+      if (overdueRow) overdueRow.style.display = 'flex';
+    }
+
   } else {
+    // 超過利息が発生しない平常時 (1段表示)
     if (tomorrowSingleContainer) tomorrowSingleContainer.classList.remove('hidden');
     if (tomorrowMultiContainer) tomorrowMultiContainer.classList.add('hidden');
 
